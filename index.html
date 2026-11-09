@@ -689,13 +689,33 @@
     if (!overlayOpen() && p && Math.abs(e.deltaY) > 20) setStack(p, S[stacks[p].key] + (e.deltaY > 0 ? 1 : -1));
   }, { passive: true });
   window.addEventListener('mousedown', () => { if (!overlayOpen()) showUI(); requestWakeLock(); });
+  // Desktop keyboard controls (listed in Settings and the README).
+  const openSettings = () => { $('hint').classList.remove('show'); $('settings').classList.add('open'); renderStatus(); };
+  const closeSettings = () => { $('settings').classList.remove('open'); if (document.activeElement) document.activeElement.blur(); };
+  function toggleFullscreen() {
+    const d = document, el = d.documentElement;
+    if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    else if (el.requestFullscreen || el.webkitRequestFullscreen) (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+  }
   window.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-    if (e.key === 'ArrowRight') setFace(S.face + 1);
-    if (e.key === 'ArrowLeft') setFace(S.face - 1);
-    if (e.key === 'ArrowDown') setWidget(S.widget + 1);
-    if (e.key === 'ArrowUp') setWidget(S.widget - 1);
-    if (e.key === 'd') setStack('c', S.clockView + 1);
+    if (e.metaKey || e.ctrlKey || e.altKey) return;              // leave browser shortcuts alone
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (k === 'Escape') { $('hint').classList.remove('show'); closeSettings(); return; }
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    if ($('settings').classList.contains('open')) { if (k === 's' || k === ',') closeSettings(); return; }
+    if ($('hint').classList.contains('show')) return;
+    const act = {
+      ArrowRight: () => setFace(S.face + 1), ArrowLeft: () => setFace(S.face - 1),
+      l: () => setFace(S.face + 1), h: () => setFace(S.face - 1),
+      ArrowDown: () => setWidget(S.widget + 1), ArrowUp: () => setWidget(S.widget - 1),
+      j: () => setWidget(S.widget + 1), k: () => setWidget(S.widget - 1),
+      d: () => setStack('c', S.clockView + 1),
+      s: openSettings, ',': openSettings, f: toggleFullscreen
+    }[k] || (/^[1-9]$/.test(k) && +k <= faces.length ? () => setFace(+k - 1) : null);
+    if (!act) return;
+    e.preventDefault();
+    act();
+    if (k !== 's' && k !== ',' && k !== 'f') showUI();           // flash the page dots so the change is visible
   });
   let resizeT;
   const relayout = () => { clearTimeout(resizeT); resizeT = setTimeout(layout, 120); };
@@ -728,7 +748,8 @@
       `${wakeMsg || 'Screen wake lock: not requested yet'}<br>` +
       (standalone ? 'Running as Home Screen app ✓' : 'Running in a browser tab. Use Share → Add to Home Screen for full-screen mode.') +
       `<br>Settings are saved on this phone and kept between launches.` +
-      `<br>Swipe left/right to change faces. On the split face, swipe up/down over the clock (analog ↔ digital) or over the widgets (weather ↔ calendar).`;
+      `<br>Swipe left/right to change faces. On the split face, swipe up/down over the clock (analog ↔ digital) or over the widgets (weather ↔ calendar).` +
+      `<br>Keyboard: ← → or 1–${faces.length} faces · ↑ ↓ widgets · D analog/digital · S settings · F full screen · Esc close.`;
   }
   function applySettings() {
     root.style.setProperty('--day-opacity', S.dim);
@@ -798,8 +819,8 @@
     bind('sWRotate', 'wRotate', 'num', startWidgetRotate);
     bind('sShiftEvery', 'shiftEvery', 'num', startShift); bind('sShiftPx', 'shiftPx', 'num', startShift);
     bind('sRotate', 'rotateMin', 'num', startRotate);
-    $('gear').addEventListener('click', e => { e.stopPropagation(); $('settings').classList.add('open'); renderStatus(); });
-    $('closeSettings').addEventListener('click', () => $('settings').classList.remove('open'));
+    $('gear').addEventListener('click', e => { e.stopPropagation(); openSettings(); });
+    $('closeSettings').addEventListener('click', closeSettings);
     $('settings').addEventListener('click', e => { if (e.target.id === 'settings') $('settings').classList.remove('open'); });
   }
 

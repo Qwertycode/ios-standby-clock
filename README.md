@@ -105,7 +105,19 @@ docs/screenshots/      README images
 python3 -m http.server 8000
 ```
 
-Then open http://localhost:8000. In a desktop browser, arrow keys change faces and widgets.
+Then open http://localhost:8000.
+
+**Keyboard (desktop browser):**
+
+| Key | Action |
+|---|---|
+| ← / → (or H / L) | Previous / next face |
+| 1, 2, 3 | Jump to a face |
+| ↑ / ↓ (or K / J) | Previous / next widget on the split face |
+| D | Switch the split face's clock between analog and digital |
+| S or , | Open / close settings |
+| F | Full screen on / off |
+| Esc | Close settings or the hint |
 
 **Add a face:**
 1. Add a `<section class="face" id="fX">…</section>` inside `#stage`. Faces are switched in document order.
