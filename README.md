@@ -114,7 +114,8 @@ Then open http://localhost:8000.
 | ← / → (or H / L) | Previous / next face |
 | 1, 2, 3 | Jump to a face |
 | ↑ / ↓ (or K / J) | Previous / next widget on the split face |
-| D | Switch the split face's clock between analog and digital |
+| Shift + ↑ / ↓ | Switch the split face's clock between analog and digital |
+| Shift + ← / → | Move the split face's clock to the left / right (top / bottom in portrait) |
 | S or , | Open / close settings |
 | F | Full screen on / off |
 | Esc | Close settings or the hint |

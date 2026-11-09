@@ -704,12 +704,17 @@
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
     if ($('settings').classList.contains('open')) { if (k === 's' || k === ',') closeSettings(); return; }
     if ($('hint').classList.contains('show')) return;
-    const act = {
+    const clockTo = side => { S.clockSide = side; $('sSide').value = side; save(); layout(); };
+    const act = e.shiftKey ? {
+      // Shift+←/→ moves the split face's clock to that side (left = top in portrait); Shift+↑/↓ flips analog ↔ digital.
+      ArrowLeft: () => clockTo('left'), ArrowRight: () => clockTo('right'), h: () => clockTo('left'), l: () => clockTo('right'),
+      ArrowUp: () => setStack('c', S.clockView - 1), ArrowDown: () => setStack('c', S.clockView + 1),
+      k: () => setStack('c', S.clockView - 1), j: () => setStack('c', S.clockView + 1)
+    }[k] : {
       ArrowRight: () => setFace(S.face + 1), ArrowLeft: () => setFace(S.face - 1),
       l: () => setFace(S.face + 1), h: () => setFace(S.face - 1),
       ArrowDown: () => setWidget(S.widget + 1), ArrowUp: () => setWidget(S.widget - 1),
       j: () => setWidget(S.widget + 1), k: () => setWidget(S.widget - 1),
-      d: () => setStack('c', S.clockView + 1),
       s: openSettings, ',': openSettings, f: toggleFullscreen
     }[k] || (/^[1-9]$/.test(k) && +k <= faces.length ? () => setFace(+k - 1) : null);
     if (!act) return;
@@ -749,7 +754,7 @@
       (standalone ? 'Running as Home Screen app ✓' : 'Running in a browser tab. Use Share → Add to Home Screen for full-screen mode.') +
       `<br>Settings are saved on this phone and kept between launches.` +
       `<br>Swipe left/right to change faces. On the split face, swipe up/down over the clock (analog ↔ digital) or over the widgets (weather ↔ calendar).` +
-      `<br>Keyboard: ← → or 1–${faces.length} faces · ↑ ↓ widgets · D analog/digital · S settings · F full screen · Esc close.`;
+      `<br>Keyboard: ← → or 1–${faces.length} faces · ↑ ↓ widgets · Shift+↑ ↓ analog/digital · Shift+← → clock side · S settings · F full screen · Esc close.`;
   }
   function applySettings() {
     root.style.setProperty('--day-opacity', S.dim);
