@@ -51,6 +51,19 @@ Unofficial project, not affiliated with or endorsed by Apple. The faces are orig
 - **Lower your brightness** manually. A web app can't change screen brightness, and dim plus black is what really saves an OLED.
 - Optional: **Guided Access** (Settings → Accessibility) locks the phone to the clock so a stray touch can't leave it.
 
+### Optional: native app that hides the home bar
+
+A Home Screen web app can't hide the white home bar at the bottom. The native app can: the bar fades out a few seconds after you stop touching the screen. The app also keeps the screen on by itself, so you don't need Auto-Lock → Never. It's the same clock, bundled inside the app. It's free but not on the App Store, so you install it with [SideStore](https://sidestore.io), using your own Apple ID:
+
+1. Set up SideStore once by following [its install guide](https://docs.sidestore.io). You need a computer (Mac, Windows or Linux) for about 10 minutes.
+2. In SideStore, open **Sources** → **+** and add this source:
+   ```
+   https://github.com/Qwertycode/ios-standby-clock/releases/latest/download/source.json
+   ```
+3. Install **StandBy Clock** from that source.
+
+With a free Apple ID, apps installed this way stop working after 7 days unless they're refreshed. SideStore refreshes them in the background, and **Refresh All** in SideStore does it by hand. New versions appear in SideStore as updates. They're built automatically on GitHub every time the clock changes.
+
 **Using it:**
 - **Swipe left / right** to change faces.
 - On the clock + widgets face, **swipe up / down** over the clock (round ↔ square ↔ digital) or over the widgets (weather ↔ calendar). **Double-tap** it to move the clock to the other side.
@@ -96,7 +109,10 @@ index.html             the app
 manifest.webmanifest   Home Screen app metadata (standalone, black)
 icons/                 app icons
 docs/screenshots/      README images
+ios/                   native wrapper (WKWebView) that hides the home bar; built by .github/workflows/ios.yml
 ```
+
+The iOS app is generated with [XcodeGen](https://github.com/yonaskolb/XcodeGen) and built unsigned on GitHub Actions. Every push to `main` that touches the app publishes a release with `StandByClock.ipa` and `source.json`. To build it on a Mac yourself, copy `index.html`, `manifest.webmanifest` and `icons/` into `ios/web/`, then run `xcodegen generate` in `ios/` and open the project.
 
 **Run locally:**
 

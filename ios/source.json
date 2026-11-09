@@ -1,0 +1,21 @@
+{
+  "name": "StandBy Clock",
+  "identifier": "io.github.qwertycode.standbyclock.source",
+  "subtitle": "Always-on StandBy-style nightstand clock",
+  "website": "https://github.com/Qwertycode/ios-standby-clock",
+  "apps": [
+    {
+      "name": "StandBy Clock",
+      "bundleIdentifier": "io.github.qwertycode.standbyclock",
+      "developerName": "Qwertycode",
+      "subtitle": "Always-on nightstand clock",
+      "localizedDescription": "The StandBy Clock web app as a native app, so the home bar fades out and the screen stays on.",
+      "iconURL": "https://qwertycode.github.io/ios-standby-clock/icons/icon-512.png",
+      "tintColor": "#F14B39",
+      "screenshotURLs": [],
+      "versions": [],
+      "appPermissions": {}
+    }
+  ],
+  "news": []
+}
