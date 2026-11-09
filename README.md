@@ -24,7 +24,7 @@ Unofficial project, not affiliated with or endorsed by Apple. The faces are orig
 
 - **Stays on.** Uses the Screen Wake Lock API, so the screen doesn't auto-lock while the clock is open.
 - **Three faces.** Swipe left or right to switch:
-  1. **Full-screen dial:** ticks run out to the screen edges, with big 12 / 3 / 6 / 9 numerals and the date.
+  1. **Full-screen dial:** a copy of StandBy's Analog face, measured from an iPhone screenshot: the rectangular tick frame, wide 12 / 3 / 6 / 9 numerals, the hands and the date (in your device's language, e.g. “MON 9” or “ПН, 9”).
   2. **Clock + widgets:** two halves you each **swipe up and down**: the clock (round dial / square dial / digital) and the widgets (weather / calendar, with faint ‹ › to page through months). **Double-tap** to swap which side the clock is on.
   3. **Big digital clock.**
 - **Night mode.** Everything turns dim red during set hours (22:30 to 07:00 by default), or always on, or off.

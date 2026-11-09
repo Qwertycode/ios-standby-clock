@@ -16,8 +16,10 @@
 <style>
   :root {
     --white: #ffffff;
-    --tick-major-a: #9f9f9f;
+    --tick-major-a: #a8a8a8;
     --tick-minor-a: #474747;
+    --tick-minor-fade: #696969;  /* face 1: minor ticks fade from black at the centre to this */
+    --date-red: #ce4447;
     --tick-major-b: #f3f2f8;
     --tick-minor-b: #525252;
     --second: #e8913a;
@@ -33,7 +35,7 @@
     --wu: 1vh;        /* widget unit: 1/100 of the widget area's height */
   }
   body.night {
-    --white: #ff3b2a; --tick-major-a: #b02414; --tick-minor-a: #4a0f08;
+    --white: #ff3b2a; --tick-major-a: #b02414; --tick-minor-a: #4a0f08; --tick-minor-fade: #6a150b; --date-red: #ff3b2a;
     --tick-major-b: #ff3b2a; --tick-minor-b: #5a130a;
     --second: #ff3b2a; --red: #ff3b2a; --gray: #8a1d10;
   }
@@ -267,7 +269,7 @@
   // ================= Orientation / layout =================
   // rot: 0 = none, 90 = rotated clockwise, -90 = counter-clockwise.
   // SW/SH = size of the safe-area clock area (#stage); ins = its insets inside #rot.
-  let rot = 0, SW = 0, SH = 0, portrait = false, ins = { t: 0, r: 0, b: 0, l: 0 };
+  let rot = 0, SW = 0, SH = 0, scr = { w: 0, h: 0 }, portrait = false, ins = { t: 0, r: 0, b: 0, l: 0 };
   const PR = { c: { x: 0, y: 0, w: 0, h: 0 }, w: { x: 0, y: 0, w: 0, h: 0 } };   // split-face pane rects in stage coords
   function screenInsets() {
     const cs = getComputedStyle($('safe'));
@@ -283,6 +285,7 @@
     rot = 0;
     if ((want === 'land') !== phoneLand) rot = S.orient === 'landscape-ccw' ? -90 : (S.orient === 'portrait' ? -90 : 90);
     const RW = rot ? h : w, RH = rot ? w : h;
+    scr = { w: RW, h: RH };
     const r = $('rot');
     r.style.width = RW + 'px'; r.style.height = RH + 'px';
     r.style.transform = rot === 90 ? `translate(${w}px,0) rotate(90deg)` : rot === -90 ? `translate(0,${h}px) rotate(-90deg)` : 'none';
@@ -313,7 +316,7 @@
     const qs = Math.min(PR.c.w * .92, PR.c.h * .9);
     Object.assign($('svgQ').style, { width: qs + 'px', height: qs + 'px', left: (PR.c.w - qs) / 2 + 'px', top: (PR.c.h - qs) / 2 + 'px' });
     $('svgQ').setAttribute('viewBox', `0 0 ${qs} ${qs}`);
-    Q = buildRectDial($('svgQ'), qs, qs, true);
+    Q = buildSquareDial($('svgQ'), qs);
     // Content boxes are scaled to fit their pane in both directions: digital time ~115 x 100 units, widgets 80 x 100.
     $('paneC').style.setProperty('--cu', Math.min(PR.c.h / 100, PR.c.w * .92 / 115) + 'px');
     $('paneW').style.setProperty('--wu', Math.min(PR.w.h / 100, PR.w.w * .9 / 80) + 'px');
@@ -344,76 +347,166 @@
       <circle cx="${cx}" cy="${cy}" r="${hubB}" fill="#000"/>`;
   }
 
-  // ================= Face 1 (and the split face's square dial): rectangular dial =================
-  // Ticks run along rays from the centre and end on the W x H rectangle's edge, so the dial follows
-  // its shape. Sizes are fractions of U = the shorter side. sq = the compact square variant.
-  let A = null, Q = null;
-  function buildA() { A = buildRectDial($('svgA'), SW, SH, false); }
-  function buildRectDial(svg, W, H, sq) {
-    const U = Math.min(W, H);
-    if (!W || !H) return null;
+  // ================= Face 1: full-screen dial, measured from Apple's StandBy "Analog" face =================
+  // All sizes are fractions of S = the screen's short side (from an iPhone StandBy screenshot).
+  // Every tick is a piece of a ray from the centre, from the dial's edge in to a line parallel to the edge
+  // the ray leaves through, so slanted ticks come out longer. Minor ticks fade towards the centre.
+  const AP = {
+    marginLong: .1502, marginShort: .0560,         // outer tick ends from the screen edges
+    minorIn: [.0656, .0625],                        // inner ends of minor + 12/6 ticks: inset from the edge [left/right, top/bottom]
+    majorIn: [.1907, .1979],                        // inner ends of 5-minute + 3/9 ticks
+    majorW: .00877, minorW: .0052, minorFade: .89, // minor ticks: black at the centre -> full colour at .89 S
+    num: { far: { w: .1040, h: .0952, gap: .0489 },   // 3 / 9 in landscape: ink box, gap to the major-tick ends
+           near: [{ w: .1623, h: .0909 }, { w: .1060, h: .0942 }], nearGap: .0440 },   // 12, 6: gap to the 12/6 tick ends
+    date: { size: .0507, gap: .106 },             // font size; gap between the date and the 3
+    hour: { len: .2435, w: .0325, start: .0541, stem: .0155, corner: .006 },
+    min:  { len: .4113, w: .0325, start: .0541, stem: .0155, corner: .006 },
+    sec:  { fwd: .4367, back: .0698, w: .0076, hubW: .0195, hubO: .01245, hubB: .0049 },
+  };
+  let S0 = 0;
+  const FAMILY = getComputedStyle(document.body).fontFamily;
+  const inkCtx = document.createElement('canvas').getContext('2d');
+  // Ink box of a string at font-size 100, relative to its start point on the baseline.
+  function ink(str, font) {
+    inkCtx.font = `${font} 100px ${FAMILY}`;
+    const m = inkCtx.measureText(str);
+    return { l: -m.actualBoundingBoxLeft, r: m.actualBoundingBoxRight, t: -m.actualBoundingBoxAscent, b: m.actualBoundingBoxDescent, w: m.width };
+  }
+  // The numerals use SF Pro Expanded where the browser offers the system font's width axis (Safari),
+  // else the normal width, stretched. Either way each numeral is fitted to Apple's measured ink box.
+  const NUMFONT = (() => {
+    const probe = (stretch) => {
+      const s = document.createElement('span');
+      s.style.cssText = `position:absolute;visibility:hidden;font:600 100px ${FAMILY};font-stretch:${stretch};white-space:nowrap`;
+      s.textContent = '1203469';
+      document.body.appendChild(s);
+      const w = s.getBoundingClientRect().width; s.remove(); return w;
+    };
+    const dom = probe('expanded') / probe('normal');
+    inkCtx.font = `600 expanded 100px ${FAMILY}`;
+    const ok = /expanded/.test(inkCtx.font);
+    const cv = ok ? inkCtx.measureText('1203469').width / ink('1203469', '600').w : 1;
+    return dom > 1.05 && Math.abs(cv / dom - 1) < .02 ? { canvas: '600 expanded', weight: 600, stretch: 'expanded' }
+                                                        : { canvas: '500', weight: 500, stretch: 'normal' };
+  })();
+  function fitText(str, box, font, attrs) {
+    const k = ink(str, font.canvas), px = .0011 * S0, py = .0008 * S0;   // measured ink boxes lose ~1px of antialiased edge
+    box = { x: box.x - px, y: box.y - py, w: box.w + 2 * px, h: box.h + 2 * py };
+    const sx = box.w / (k.r - k.l), sy = box.h / (k.b - k.t);
+    return `<text transform="translate(${fmt(box.x - sx * k.l)} ${fmt(box.y - sy * k.t)}) scale(${fmt(sx, 5)} ${fmt(sy, 5)})" font-size="100" font-weight="${font.weight}" font-stretch="${font.stretch}" ${attrs || ''}>${str}</text>`;
+  }
+  // Hand pointing up from (cx, cy): a thin stem, then a wide bar with a round tip and slightly rounded shoulders.
+  function appleHand(cls, cx, cy, p, S) {
+    const w = p.w * S, h = w / 2, x0 = cx - h, x1 = cx + h, yb = cy - p.start * S, yt = cy - p.len * S + h, rc = p.corner * S;
+    const d = `M${fmt(x0)} ${fmt(yb - rc)}V${fmt(yt)}A${fmt(h)} ${fmt(h)} 0 0 1 ${fmt(x1)} ${fmt(yt)}V${fmt(yb - rc)}` +
+              `A${fmt(rc)} ${fmt(rc)} 0 0 1 ${fmt(x1 - rc)} ${fmt(yb)}H${fmt(x0 + rc)}A${fmt(rc)} ${fmt(rc)} 0 0 1 ${fmt(x0)} ${fmt(yb - rc)}Z`;
+    return `<g class="${cls}" transform="rotate(0 ${cx} ${cy})">
+      <line x1="${cx}" y1="${cy}" x2="${cx}" y2="${fmt(yb + 1)}" stroke="var(--white)" stroke-width="${fmt(p.stem * S)}" stroke-linecap="round"/>
+      <path d="${d}" fill="var(--white)"/></g>`;
+  }
+  function buildA() {
+    const svg = $('svgA'), W = SW, H = SH;
+    if (!W || !H) { A = null; return; }
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const S = Math.min(scr.w, scr.h), land = W >= H;
+    S0 = S;
     const cx = W / 2, cy = H / 2;
+    // Outer rectangle half-sizes along the long (L) and short (s) screen axes, kept inside the safe area.
+    const hl = Math.min(Math.max(scr.w, scr.h) / 2 - AP.marginLong * S, Math.max(W, H) / 2 - .01 * S);
+    const hs = Math.min(S / 2 - AP.marginShort * S, Math.min(W, H) / 2 - .01 * S);
+    const [ox, oy] = land ? [hl, hs] : [hs, hl];
+    const inner = (ins) => [ox - ins[0] * S, oy - ins[1] * S];
+    const [mnx, mny] = inner(AP.minorIn), [mjx, mjy] = inner(AP.majorIn);
+    let html = `<defs><radialGradient id="aFade" gradientUnits="userSpaceOnUse" cx="${cx}" cy="${cy}" r="${fmt(AP.minorFade * S)}">
+      <stop offset="0" style="stop-color:var(--tick-minor-fade)" stop-opacity="0"/><stop offset=".62" style="stop-color:var(--tick-minor-fade)" stop-opacity=".66"/>
+      <stop offset="1" style="stop-color:var(--tick-minor-fade)"/></radialGradient></defs>`;
+    for (let i = 0; i < 60; i++) {
+      const a = i * Math.PI / 30, sx = Math.sin(a), sy = -Math.cos(a);
+      const shortAxis = land ? (i === 0 || i === 30) : (i === 15 || i === 45);
+      const major = i % 5 === 0 && !shortAxis;
+      const w = (i % 5 === 0 ? AP.majorW : AP.minorW) * S;
+      // Does the ray leave through a side or the top/bottom? The tick runs from that edge to the matching
+      // inner line; the round caps reach past both ends (their extent across the edge is what was measured).
+      const side = Math.abs(sx) * oy > Math.abs(sy) * ox, e = side ? Math.abs(sx) : Math.abs(sy);
+      const o = side ? ox : oy, n = side ? (major ? mjx : mnx) : (major ? mjy : mny);
+      const t1 = (o - w / 2) / e, t0 = (n + w / 2) / e;
+      const col = i % 5 === 0 ? 'var(--tick-major-a)' : 'url(#aFade)';
+      html += `<line x1="${fmt(cx + sx * t0)}" y1="${fmt(cy + sy * t0)}" x2="${fmt(cx + sx * t1)}" y2="${fmt(cy + sy * t1)}" stroke="${col}" stroke-width="${fmt(w)}" stroke-linecap="round"/>`;
+    }
+    // Numerals: 3 / 9 sit just inside the long ticks on the long axis, 12 / 6 just inside the short ticks.
+    const f = AP.num.far, n = AP.num.near, box = {};
+    const farOff = (land ? mjx : mjy) - f.gap * S, nearOff = (land ? mny : mnx) - AP.num.nearGap * S;
+    if (land) {
+      box[3] = { x: cx + farOff - f.w * S, y: cy - f.h * S / 2, w: f.w * S, h: f.h * S };
+      box[9] = { x: cx - farOff, y: cy - f.h * S / 2, w: f.w * S, h: f.h * S };
+      box[12] = { x: cx - n[0].w * S / 2, y: cy - nearOff, w: n[0].w * S, h: n[0].h * S };
+      box[6] = { x: cx - n[1].w * S / 2, y: cy + nearOff - n[1].h * S, w: n[1].w * S, h: n[1].h * S };
+    } else {
+      box[12] = { x: cx - n[0].w * S / 2, y: cy - farOff, w: n[0].w * S, h: n[0].h * S };
+      box[6] = { x: cx - n[1].w * S / 2, y: cy + farOff - n[1].h * S, w: n[1].w * S, h: n[1].h * S };
+      box[3] = { x: cx + nearOff - f.w * S, y: cy - f.h * S / 2, w: f.w * S, h: f.h * S };
+      box[9] = { x: cx - nearOff, y: cy - f.h * S / 2, w: f.w * S, h: f.h * S };
+    }
+    for (const k of [12, 3, 6, 9]) html += fitText(k, box[k], NUMFONT, 'fill="var(--white)"');
+    html += `<text class="aDate" font-weight="500" font-size="${fmt(AP.date.size * S)}"><tspan fill="var(--date-red)" class="aDow"></tspan><tspan fill="var(--white)" class="aDay"></tspan></text>`;
+    html += appleHand('hh', cx, cy, AP.hour, S) + appleHand('hm', cx, cy, AP.min, S);
+    const c = AP.sec;
+    html += secondSVG(cx, cy, c.fwd * S, c.back * S, c.w * S, c.hubW * S, c.hubO * S, c.hubB * S);
+    svg.innerHTML = html;
+    const dow = svg.querySelector('.aDow'), day = svg.querySelector('.aDay'), date = svg.querySelector('.aDate');
+    // Date in the device's language and order (e.g. "MON 9", "ПН, 9"); the weekday in red.
+    // Landscape: ends a fixed gap left of the 3, shrunk if it would reach the hub. Portrait: centred between the hub and the 6.
+    const setDate = (now) => {
+      const parts = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric' }).formatToParts(now);
+      const wd = parts.find(p => p.type === 'weekday').value.toLocaleUpperCase();
+      const sep = parts[0].type === 'weekday' && parts[1].type === 'literal' ? parts[1].value : ' ';   // "ПН, 9"; en-US would say "9 Mon"
+      const rest = sep + now.getDate();
+      dow.textContent = wd; day.textContent = rest;
+      const size = AP.date.size * S, all = ink(wd + rest, '500'), cap = -ink(wd, '500').t;
+      let k = size / 100;
+      if (land) {
+        const right = box[3].x - AP.date.gap * S, left = cx + c.hubW * S + .03 * S;
+        k = Math.min(k, (right - left) / (all.r - all.l));
+        date.setAttribute('x', fmt(right - all.r * k));
+      } else {
+        date.setAttribute('x', fmt(cx - (all.l + all.r) / 2 * k));
+      }
+      const yMid = land ? cy : (cy + c.hubW * S + box[6].y) / 2;
+      date.setAttribute('font-size', fmt(k * 100));
+      date.setAttribute('y', fmt(yMid + cap * k / 2));
+    };
+    A = { cx, cy, h: svg.querySelector('.hh'), m: svg.querySelector('.hm'), s: svg.querySelector('.hs'), setDate };
+    lastDateKey = '';
+  }
+
+  // ================= Split face: square dial =================
+  // Ticks run along rays from the centre and end on the square's edge. Sizes are fractions of U = its side.
+  let A = null, Q = null;
+  function buildSquareDial(svg, U) {
+    if (!U) return null;
+    svg.setAttribute('viewBox', `0 0 ${U} ${U}`);
+    const cx = U / 2, cy = U / 2;
     let html = '';
     for (let i = 0; i < 60; i++) {
       const a = i * Math.PI / 30, sx = Math.sin(a), sy = -Math.cos(a);
-      const t = Math.min(Math.abs(sx) > 1e-6 ? (W / 2) / Math.abs(sx) : Infinity,
-                         Math.abs(sy) > 1e-6 ? (H / 2) / Math.abs(sy) : Infinity);
+      const t = (U / 2) / Math.max(Math.abs(sx), Math.abs(sy));
       const ox = cx + sx * t, oy = cy + sy * t;
-      // the two numerals on the short axis get a short tick, the other two a long one
-      const shortAxis = sq || (W >= H ? (i === 0 || i === 30) : (i === 15 || i === 45));
       let len, w, col;
-      if (i % 15 === 0)     { len = shortAxis ? .05 * U : .19 * U; w = .0075 * U; col = 'var(--tick-major-a)'; }
-      else if (i % 5 === 0) { len = (sq ? .15 : .18) * U;  w = .0075 * U; col = 'var(--tick-major-a)'; }
+      if (i % 15 === 0)     { len = .05 * U; w = .0075 * U; col = 'var(--tick-major-a)'; }
+      else if (i % 5 === 0) { len = .15 * U; w = .0075 * U; col = 'var(--tick-major-a)'; }
       else                  { len = .062 * U; w = .0055 * U; col = 'var(--tick-minor-a)'; }
       html += `<line x1="${fmt(ox)}" y1="${fmt(oy)}" x2="${fmt(ox - sx * len)}" y2="${fmt(oy - sy * len)}" stroke="${col}" stroke-width="${fmt(w)}" stroke-linecap="round"/>`;
     }
-    const fs = (sq ? .12 : .125) * U;
+    const fs = .12 * U;
     const num = (n, x, y) => `<text transform="translate(${fmt(x)} ${fmt(y)}) scale(1.3 1)" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" font-weight="600" fill="var(--white)">${n}</text>`;
-    const land = sq || W >= H * .87;   // near-square portrait screens use the landscape layout too
-    // 3 / 9: on near-square screens push them out so the date still fits between the hub and the 3.
-    let x3 = W - .284 * U, x9 = .29 * U;
-    if (sq) { x3 = W - .15 * U; x9 = .15 * U; }
-    else if (land) { x3 = Math.min(W - .15 * U, Math.max(x3, cx + .36 * U)); x9 = Math.max(.15 * U, Math.min(x9, cx - .36 * U)); }
-    const y12 = sq ? .19 * U : land ? .124 * U : .29 * U, y6 = sq ? H - .19 * U : land ? H - .112 * U : H - .29 * U;
-    html += num(12, cx, y12) + num(3, x3, cy) + num(6, cx, y6) + num(9, x9, cy);
-    if (!sq) html += `<text class="aDate" dominant-baseline="central" font-weight="500"><tspan fill="var(--red)" class="aDow"></tspan><tspan fill="var(--white)" class="aDay"></tspan></text>`;
-    const L = land ? 1 : 1.35;   // longer hands on the taller portrait dial
-    html += handSVG('hh', cx, cy, .065 * U, .012 * U, .26 * U * L, .038 * U, 'var(--white)');
-    html += handSVG('hm', cx, cy, .065 * U, .012 * U, .455 * U * (sq ? .97 : land ? 1 : .98), .038 * U, 'var(--white)');
-    html += secondSVG(cx, cy, .5 * U * (sq ? .96 : land ? 1 : .96), .088 * U, .006 * U, .024 * U, .015 * U, .006 * U);
+    html += num(12, cx, .19 * U) + num(3, U - .15 * U, cy) + num(6, cx, U - .19 * U) + num(9, .15 * U, cy);
+    html += handSVG('hh', cx, cy, .065 * U, .012 * U, .26 * U, .038 * U, 'var(--white)');
+    html += handSVG('hm', cx, cy, .065 * U, .012 * U, .455 * U * .97, .038 * U, 'var(--white)');
+    html += secondSVG(cx, cy, .5 * U * .96, .088 * U, .006 * U, .024 * U, .015 * U, .006 * U);
     svg.innerHTML = html;
-    lastDateKey = '';
-    return { cx, cy, h: svg.querySelector('.hh'), m: svg.querySelector('.hm'), s: svg.querySelector('.hs'),
-             dow: svg.querySelector('.aDow'), day: svg.querySelector('.aDay'), date: svg.querySelector('.aDate'),
-             g: { W, H, U, cx, cy, x3, y6, fs, land, dateBase: (sq ? .044 : land ? .058 : .0725) * U } };
+    return { cx, cy, h: svg.querySelector('.hh'), m: svg.querySelector('.hm'), s: svg.querySelector('.hs') };
   }
 
-  // The face-1 date goes right of the hub (landscape) or below it (portrait). On near-square screens the
-  // preferred slot gets squeezed by the 3 / 6 numerals, so fall back to the other slot, then to a smaller font.
-  function placeDate(D) {
-    const t = D && D.date;
-    if (!t) return;
-    const { U, cx, cy, x3, y6, fs, land, dateBase: base } = D.g;
-    t.setAttribute('font-size', fmt(base));
-    const len = t.getComputedTextLength() || base * 3.7;          // width at the base size
-    const hub = .05 * U, gap = .03 * U, capH = .72;                // capH: cap height / font size
-    const rL = cx + hub + gap, rR = x3 - .39 * fs - gap;           // right slot: hub .. left edge of "3"
-    const bT = cy + hub + gap, bB = y6 - capH / 2 * fs - gap;      // below slot: hub .. top of "6"
-    const fitR = Math.min(1, (rR - rL) / len), fitB = Math.min(1, (bB - bT) / (capH * base), D.g.W * .8 / len);
-    // Landscape / square: always on the 9-3 line (shrunk to fit if needed). Portrait: above the 6.
-    const useR = land || (fitB < 1 && fitR > fitB);
-    const size = base * (useR ? fitR : fitB);
-    t.setAttribute('font-size', fmt(size));
-    if (useR) {
-      const x = Math.max(rL + len * size / base, Math.min(x3 - .142 * U, rR));   // original spot when it fits
-      t.setAttribute('x', fmt(x)); t.setAttribute('y', fmt(cy)); t.setAttribute('text-anchor', 'end');
-    } else {
-      const half = capH * size / 2;
-      const y = Math.min(cy + .3 * U, bB - half);                  // original spot when it fits
-      t.setAttribute('x', fmt(cx)); t.setAttribute('y', fmt(Math.max(bT + half, y))); t.setAttribute('text-anchor', 'middle');
-    }
-  }
 
   // ================= Face 2: dial (viewBox -100..100, ticks end at r=98.5) =================
   let B;
@@ -639,7 +732,7 @@
     const dKey = now.toDateString() + weekStart();
     if (dKey !== lastDateKey) {
       lastDateKey = dKey;
-      for (const D of [A, Q]) if (D && D.date) { D.dow.textContent = dowShort; D.day.textContent = ' ' + now.getDate(); placeDate(D); }
+      if (A) A.setDate(now);
       renderCal(now);
       $('dDate').innerHTML = `<b>${now.toLocaleDateString('en-US', { weekday: 'long' })}</b> ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`;
       $('wtD').innerHTML = `<b>${dowShort}</b> ${now.getDate()}`;
