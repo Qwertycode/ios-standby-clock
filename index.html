@@ -377,7 +377,7 @@
     else if (land) { x3 = Math.min(W - .15 * U, Math.max(x3, cx + .36 * U)); x9 = Math.max(.15 * U, Math.min(x9, cx - .36 * U)); }
     const y12 = sq ? .19 * U : land ? .124 * U : .29 * U, y6 = sq ? H - .19 * U : land ? H - .112 * U : H - .29 * U;
     html += num(12, cx, y12) + num(3, x3, cy) + num(6, cx, y6) + num(9, x9, cy);
-    html += `<text class="aDate" dominant-baseline="central" font-weight="500"><tspan fill="var(--red)" class="aDow"></tspan><tspan fill="var(--white)" class="aDay"></tspan></text>`;
+    if (!sq) html += `<text class="aDate" dominant-baseline="central" font-weight="500"><tspan fill="var(--red)" class="aDow"></tspan><tspan fill="var(--white)" class="aDay"></tspan></text>`;
     const L = land ? 1 : 1.35;   // longer hands on the taller portrait dial
     html += handSVG('hh', cx, cy, .065 * U, .012 * U, .26 * U * L, .038 * U, 'var(--white)');
     html += handSVG('hm', cx, cy, .065 * U, .012 * U, .455 * U * (sq ? .97 : land ? 1 : .98), .038 * U, 'var(--white)');
@@ -639,7 +639,7 @@
     const dKey = now.toDateString() + weekStart();
     if (dKey !== lastDateKey) {
       lastDateKey = dKey;
-      for (const D of [A, Q]) if (D) { D.dow.textContent = dowShort; D.day.textContent = ' ' + now.getDate(); placeDate(D); }
+      for (const D of [A, Q]) if (D && D.date) { D.dow.textContent = dowShort; D.day.textContent = ' ' + now.getDate(); placeDate(D); }
       renderCal(now);
       $('dDate').innerHTML = `<b>${now.toLocaleDateString('en-US', { weekday: 'long' })}</b> ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`;
       $('wtD').innerHTML = `<b>${dowShort}</b> ${now.getDate()}`;
