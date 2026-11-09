@@ -17,7 +17,6 @@
   :root {
     --white: #ffffff;
     --tick-major-a: #a8a8a8;
-    --tick-minor-a: #474747;
     --tick-minor-fade: #696969;  /* face 1: minor ticks fade from black at the centre to this */
     --date-red: #ce4447;
     --tick-major-b: #f3f2f8;
@@ -35,7 +34,7 @@
     --wu: 1vh;        /* widget unit: 1/100 of the widget area's height */
   }
   body.night {
-    --white: #ff3b2a; --tick-major-a: #b02414; --tick-minor-a: #4a0f08; --tick-minor-fade: #6a150b; --date-red: #ff3b2a;
+    --white: #ff3b2a; --tick-major-a: #b02414; --tick-minor-fade: #6a150b; --date-red: #ff3b2a;
     --tick-major-b: #ff3b2a; --tick-minor-b: #5a130a;
     --second: #ff3b2a; --red: #ff3b2a; --gray: #8a1d10;
   }
@@ -316,7 +315,7 @@
     const qs = Math.min(PR.c.w * .92, PR.c.h * .9);
     Object.assign($('svgQ').style, { width: qs + 'px', height: qs + 'px', left: (PR.c.w - qs) / 2 + 'px', top: (PR.c.h - qs) / 2 + 'px' });
     $('svgQ').setAttribute('viewBox', `0 0 ${qs} ${qs}`);
-    Q = buildSquareDial($('svgQ'), qs);
+    Q = buildQ($('svgQ'), qs);
     // Content boxes are scaled to fit their pane in both directions: digital time ~115 x 100 units, widgets 80 x 100.
     $('paneC').style.setProperty('--cu', Math.min(PR.c.h / 100, PR.c.w * .92 / 115) + 'px');
     $('paneW').style.setProperty('--wu', Math.min(PR.w.h / 100, PR.w.w * .9 / 80) + 'px');
@@ -347,7 +346,7 @@
       <circle cx="${cx}" cy="${cy}" r="${hubB}" fill="#000"/>`;
   }
 
-  // ================= Face 1: full-screen dial, measured from Apple's StandBy "Analog" face =================
+  // ================= Rectangular dial (face 1 and the split face), measured from StandBy's Analog face =================
   // All sizes are fractions of S = the screen's short side (from an iPhone StandBy screenshot).
   // Every tick is a piece of a ray from the centre, from the dial's edge in to a line parallel to the edge
   // the ray leaves through, so slanted ticks come out longer. Minor ticks fade towards the centre.
@@ -405,24 +404,33 @@
       <path d="${d}" fill="var(--white)"/></g>`;
   }
   function buildA() {
-    const svg = $('svgA'), W = SW, H = SH;
+    const W = SW, H = SH, S = Math.min(scr.w, scr.h);
     if (!W || !H) { A = null; return; }
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    const S = Math.min(scr.w, scr.h), land = W >= H;
-    S0 = S;
-    const cx = W / 2, cy = H / 2;
-    // Outer rectangle half-sizes along the long (L) and short (s) screen axes, kept inside the safe area.
+    // Outer frame half-sizes along the long and short screen axes, kept inside the safe area.
     const hl = Math.min(Math.max(scr.w, scr.h) / 2 - AP.marginLong * S, Math.max(W, H) / 2 - .01 * S);
     const hs = Math.min(S / 2 - AP.marginShort * S, Math.min(W, H) / 2 - .01 * S);
-    const [ox, oy] = land ? [hl, hs] : [hs, hl];
+    A = buildAppleDial($('svgA'), W, H, S, W >= H ? hl : hs, W >= H ? hs : hl, 'aFade', true);
+  }
+  // The split face's square dial: the same design, scaled so its frame fills the square
+  // (face 1's frame is S/2 - marginShort * S from the centre on the short axis). Both axes are
+  // short there, so all four numerals get the short tick and sit like the 12 / 6.
+  function buildQ(svg, U) {
+    if (!U) return null;
+    return buildAppleDial(svg, U, U, U / 2 / (.5 - AP.marginShort), U / 2, U / 2, 'qFade', false, true);
+  }
+  // (ox, oy): half-sizes of the frame the outer tick ends sit on; S: the scale all AP sizes are fractions of.
+  function buildAppleDial(svg, W, H, S, ox, oy, fadeId, withDate, square) {
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const land = W >= H, cx = W / 2, cy = H / 2;
+    S0 = S;
     const inner = (ins) => [ox - ins[0] * S, oy - ins[1] * S];
     const [mnx, mny] = inner(AP.minorIn), [mjx, mjy] = inner(AP.majorIn);
-    let html = `<defs><radialGradient id="aFade" gradientUnits="userSpaceOnUse" cx="${cx}" cy="${cy}" r="${fmt(AP.minorFade * S)}">
+    let html = `<defs><radialGradient id="${fadeId}" gradientUnits="userSpaceOnUse" cx="${cx}" cy="${cy}" r="${fmt(AP.minorFade * S)}">
       <stop offset="0" style="stop-color:var(--tick-minor-fade)" stop-opacity="0"/><stop offset=".62" style="stop-color:var(--tick-minor-fade)" stop-opacity=".66"/>
       <stop offset="1" style="stop-color:var(--tick-minor-fade)"/></radialGradient></defs>`;
     for (let i = 0; i < 60; i++) {
       const a = i * Math.PI / 30, sx = Math.sin(a), sy = -Math.cos(a);
-      const shortAxis = land ? (i === 0 || i === 30) : (i === 15 || i === 45);
+      const shortAxis = i % 15 === 0 && (square || (land ? i % 30 === 0 : i % 30 === 15));
       const major = i % 5 === 0 && !shortAxis;
       const w = (i % 5 === 0 ? AP.majorW : AP.minorW) * S;
       // Does the ray leave through a side or the top/bottom? The tick runs from that edge to the matching
@@ -430,12 +438,13 @@
       const side = Math.abs(sx) * oy > Math.abs(sy) * ox, e = side ? Math.abs(sx) : Math.abs(sy);
       const o = side ? ox : oy, n = side ? (major ? mjx : mnx) : (major ? mjy : mny);
       const t1 = (o - w / 2) / e, t0 = (n + w / 2) / e;
-      const col = i % 5 === 0 ? 'var(--tick-major-a)' : 'url(#aFade)';
+      const col = i % 5 === 0 ? 'var(--tick-major-a)' : `url(#${fadeId})`;
       html += `<line x1="${fmt(cx + sx * t0)}" y1="${fmt(cy + sy * t0)}" x2="${fmt(cx + sx * t1)}" y2="${fmt(cy + sy * t1)}" stroke="${col}" stroke-width="${fmt(w)}" stroke-linecap="round"/>`;
     }
-    // Numerals: 3 / 9 sit just inside the long ticks on the long axis, 12 / 6 just inside the short ticks.
+    // Numerals: 3 / 9 sit just inside the long ticks on the long axis, 12 / 6 just inside the short ticks (all four on a square).
     const f = AP.num.far, n = AP.num.near, box = {};
-    const farOff = (land ? mjx : mjy) - f.gap * S, nearOff = (land ? mny : mnx) - AP.num.nearGap * S;
+    const nearOff = (land ? mny : mnx) - AP.num.nearGap * S;
+    const farOff = square ? mnx - AP.num.nearGap * S : (land ? mjx : mjy) - f.gap * S;
     if (land) {
       box[3] = { x: cx + farOff - f.w * S, y: cy - f.h * S / 2, w: f.w * S, h: f.h * S };
       box[9] = { x: cx - farOff, y: cy - f.h * S / 2, w: f.w * S, h: f.h * S };
@@ -448,7 +457,7 @@
       box[9] = { x: cx - nearOff, y: cy - f.h * S / 2, w: f.w * S, h: f.h * S };
     }
     for (const k of [12, 3, 6, 9]) html += fitText(k, box[k], NUMFONT, 'fill="var(--white)"');
-    html += `<text class="aDate" font-weight="500" font-size="${fmt(AP.date.size * S)}"><tspan fill="var(--date-red)" class="aDow"></tspan><tspan fill="var(--white)" class="aDay"></tspan></text>`;
+    if (withDate) html += `<text class="aDate" font-weight="500" font-size="${fmt(AP.date.size * S)}"><tspan fill="var(--date-red)" class="aDow"></tspan><tspan fill="var(--white)" class="aDay"></tspan></text>`;
     html += appleHand('hh', cx, cy, AP.hour, S) + appleHand('hm', cx, cy, AP.min, S);
     const c = AP.sec;
     html += secondSVG(cx, cy, c.fwd * S, c.back * S, c.w * S, c.hubW * S, c.hubO * S, c.hubB * S);
@@ -475,37 +484,11 @@
       date.setAttribute('font-size', fmt(k * 100));
       date.setAttribute('y', fmt(yMid + cap * k / 2));
     };
-    A = { cx, cy, h: svg.querySelector('.hh'), m: svg.querySelector('.hm'), s: svg.querySelector('.hs'), setDate };
     lastDateKey = '';
+    return { cx, cy, h: svg.querySelector('.hh'), m: svg.querySelector('.hm'), s: svg.querySelector('.hs'), setDate: date && setDate };
   }
 
-  // ================= Split face: square dial =================
-  // Ticks run along rays from the centre and end on the square's edge. Sizes are fractions of U = its side.
-  let A = null, Q = null;
-  function buildSquareDial(svg, U) {
-    if (!U) return null;
-    svg.setAttribute('viewBox', `0 0 ${U} ${U}`);
-    const cx = U / 2, cy = U / 2;
-    let html = '';
-    for (let i = 0; i < 60; i++) {
-      const a = i * Math.PI / 30, sx = Math.sin(a), sy = -Math.cos(a);
-      const t = (U / 2) / Math.max(Math.abs(sx), Math.abs(sy));
-      const ox = cx + sx * t, oy = cy + sy * t;
-      let len, w, col;
-      if (i % 15 === 0)     { len = .05 * U; w = .0075 * U; col = 'var(--tick-major-a)'; }
-      else if (i % 5 === 0) { len = .15 * U; w = .0075 * U; col = 'var(--tick-major-a)'; }
-      else                  { len = .062 * U; w = .0055 * U; col = 'var(--tick-minor-a)'; }
-      html += `<line x1="${fmt(ox)}" y1="${fmt(oy)}" x2="${fmt(ox - sx * len)}" y2="${fmt(oy - sy * len)}" stroke="${col}" stroke-width="${fmt(w)}" stroke-linecap="round"/>`;
-    }
-    const fs = .12 * U;
-    const num = (n, x, y) => `<text transform="translate(${fmt(x)} ${fmt(y)}) scale(1.3 1)" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" font-weight="600" fill="var(--white)">${n}</text>`;
-    html += num(12, cx, .19 * U) + num(3, U - .15 * U, cy) + num(6, cx, U - .19 * U) + num(9, .15 * U, cy);
-    html += handSVG('hh', cx, cy, .065 * U, .012 * U, .26 * U, .038 * U, 'var(--white)');
-    html += handSVG('hm', cx, cy, .065 * U, .012 * U, .455 * U * .97, .038 * U, 'var(--white)');
-    html += secondSVG(cx, cy, .5 * U * .96, .088 * U, .006 * U, .024 * U, .015 * U, .006 * U);
-    svg.innerHTML = html;
-    return { cx, cy, h: svg.querySelector('.hh'), m: svg.querySelector('.hm'), s: svg.querySelector('.hs') };
-  }
+  let A = null, Q = null;   // face 1 dial, split-face square dial
 
 
   // ================= Face 2: dial (viewBox -100..100, ticks end at r=98.5) =================
@@ -732,7 +715,7 @@
     const dKey = now.toDateString() + weekStart();
     if (dKey !== lastDateKey) {
       lastDateKey = dKey;
-      if (A) A.setDate(now);
+      if (A && A.setDate) A.setDate(now);
       renderCal(now);
       $('dDate').innerHTML = `<b>${now.toLocaleDateString('en-US', { weekday: 'long' })}</b> ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`;
       $('wtD').innerHTML = `<b>${dowShort}</b> ${now.getDate()}`;
