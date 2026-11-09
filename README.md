@@ -25,7 +25,7 @@ Unofficial project, not affiliated with or endorsed by Apple. The faces are orig
 - **Stays on.** Uses the Screen Wake Lock API, so the screen doesn't auto-lock while the clock is open.
 - **Three faces.** Swipe left or right to switch:
   1. **Full-screen dial:** ticks run out to the screen edges, with big 12 / 3 / 6 / 9 numerals and the date.
-  2. **Clock + widgets:** two halves you each **swipe up and down**: the clock (analog / digital) and the widgets (weather / calendar). **Double-tap** to swap which side the clock is on.
+  2. **Clock + widgets:** two halves you each **swipe up and down**: the clock (round dial / square dial / digital) and the widgets (weather / calendar, with faint ‹ › to page through months). **Double-tap** to swap which side the clock is on.
   3. **Big digital clock.**
 - **Night mode.** Everything turns dim red during set hours (22:30 to 07:00 by default), or always on, or off.
 - **Burn-in protection:**
@@ -53,7 +53,7 @@ Unofficial project, not affiliated with or endorsed by Apple. The faces are orig
 
 **Using it:**
 - **Swipe left / right** to change faces.
-- On the clock + widgets face, **swipe up / down** over the clock (analog ↔ digital) or over the widgets (weather ↔ calendar). **Double-tap** it to move the clock to the other side.
+- On the clock + widgets face, **swipe up / down** over the clock (round ↔ square ↔ digital) or over the widgets (weather ↔ calendar). **Double-tap** it to move the clock to the other side.
 - **Tap** to show the ⚙︎ settings button.
 
 ## Settings
@@ -113,8 +113,9 @@ Then open http://localhost:8000.
 | ← / → (or H / L) | Previous / next face |
 | 1, 2, 3 | Jump to a face |
 | ↑ / ↓ (or K / J) | Previous / next widget on the split face |
-| Shift + ↑ / ↓ | Switch the split face's clock between analog and digital |
-| Shift + ← / → | Move the split face's clock to the left / right (top / bottom in portrait) |
+| Shift + ↑ / ↓ | Switch the split face's clock: round dial, square dial, digital |
+| Shift + ← / → | On the split face, move the clock to the left / right (top / bottom in portrait) |
+| [ / ] | Calendar: previous / next month (back to this month after a minute) |
 | S or , | Open / close settings |
 | F | Full screen on / off |
 | Esc | Close settings or the hint |

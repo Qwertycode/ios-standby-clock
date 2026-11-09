@@ -68,7 +68,7 @@
   .pane { position: absolute; overflow: hidden; }
   .track { position: absolute; inset: 0; transition: transform .55s cubic-bezier(.25,.8,.25,1); }
   .pv { position: absolute; left: 0; width: 100%; height: 100%; }
-  #dialB { position: absolute; overflow: visible; }   /* size/position set in JS */
+  #dialB, #svgQ { position: absolute; overflow: visible; }   /* size/position set in JS */
   .wbox { position: absolute; left: 50%; top: 50%; width: calc(80 * var(--wu)); height: calc(100 * var(--wu)); margin: calc(-50 * var(--wu)) 0 0 calc(-40 * var(--wu)); }
 
   .w-weather .city { position: absolute; top: calc(7.6 * var(--wu)); left: calc(1.1 * var(--wu)); font-size: calc(9.2 * var(--wu)); font-weight: 600; line-height: 1; white-space: nowrap; display: flex; align-items: center; gap: calc(2.2 * var(--wu)); }
@@ -82,6 +82,10 @@
 
   .w-cal .month { position: absolute; top: calc(9.4 * var(--wu)); left: calc(-0.4 * var(--wu)); font-size: calc(6.4 * var(--wu)); font-weight: 600; color: var(--red); line-height: 1; letter-spacing: .01em; }
   .w-cal .cell { position: absolute; width: calc(11.7 * var(--wu)); height: calc(11.7 * var(--wu)); margin: calc(-5.85 * var(--wu)) 0 0 calc(-5.85 * var(--wu)); display: flex; align-items: center; justify-content: center; font-size: calc(5.9 * var(--wu)); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .w-cal .nav { position: absolute; top: calc(6.6 * var(--wu)); width: calc(11 * var(--wu)); height: calc(11 * var(--wu)); margin-left: calc(-5.5 * var(--wu));
+                background: none; border: 0; padding: 0; display: flex; align-items: center; justify-content: center; opacity: .38; cursor: pointer; }
+  .w-cal .nav svg { width: calc(3.6 * var(--wu)); height: calc(6 * var(--wu)); fill: none; stroke: var(--gray); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .w-cal .nav:active { opacity: .8; }
   .w-cal .dow { font-size: calc(5 * var(--wu)); font-weight: 500; }
   .w-cal .we { color: var(--gray); }
   .w-cal .today::before { content: ""; position: absolute; width: calc(10.4 * var(--wu)); height: calc(10.4 * var(--wu)); border-radius: 50%; background: var(--red); z-index: -1; }
@@ -169,6 +173,7 @@
       <div class="pane" id="paneC">
         <div class="track" id="trackC">
           <div class="pv"><svg id="dialB" viewBox="-100 -100 200 200"></svg></div>
+          <div class="pv"><svg id="svgQ" class="dialQ"></svg></div>
           <div class="pv w-time"><div class="t" id="wtT"></div><div class="d" id="wtD"></div></div>
         </div>
         <div class="vdots" id="dotsC"></div>
@@ -244,13 +249,14 @@
     orient: 'follow', h24: true, secs: true, smooth: true, dim: 1,
     night: 'auto', nightDim: 0.45, nightStart: '22:30', nightEnd: '07:00',
     city: '', place: null, units: 'C', week: 'auto', wRotate: 10, clockSide: 'left',
-    shiftEvery: 60, shiftPx: 8, rotateMin: 0, face: 0, widget: 0, clockView: 0, v: 2
+    shiftEvery: 60, shiftPx: 8, rotateMin: 0, face: 0, widget: 0, clockView: 0, v: 3
   };
   const KEY = 'standbyclock';
   let S = { ...DEFAULTS };
   try { S = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
-  if (S.v !== 2) { S.week = 'auto'; S.widget = 0; S.v = 2; save(); }   // v1 had a fixed Sunday default and 3 widgets
+  if (S.v !== 2 && S.v !== 3) { S.week = 'auto'; S.widget = 0; S.v = 2; }   // v1 had a fixed Sunday default and 3 widgets
+  if (S.v === 2) { if (S.clockView === 1) S.clockView = 2; S.v = 3; save(); }  // v2 clock views: analog, digital
 
   const $ = id => document.getElementById(id);
   const root = document.documentElement;
@@ -304,6 +310,10 @@
     place($('paneC'), PR.c); place($('paneW'), PR.w);
     const size = Math.min(PR.c.w * .9, PR.c.h * .86);
     Object.assign($('dialB').style, { width: size + 'px', height: size + 'px', left: (PR.c.w - size) / 2 + 'px', top: (PR.c.h - size) / 2 + 'px' });
+    const qs = Math.min(PR.c.w * .92, PR.c.h * .9);
+    Object.assign($('svgQ').style, { width: qs + 'px', height: qs + 'px', left: (PR.c.w - qs) / 2 + 'px', top: (PR.c.h - qs) / 2 + 'px' });
+    $('svgQ').setAttribute('viewBox', `0 0 ${qs} ${qs}`);
+    Q = buildRectDial($('svgQ'), qs, qs, true);
     // Content boxes are scaled to fit their pane in both directions: digital time ~115 x 100 units, widgets 80 x 100.
     $('paneC').style.setProperty('--cu', Math.min(PR.c.h / 100, PR.c.w * .92 / 115) + 'px');
     $('paneW').style.setProperty('--wu', Math.min(PR.w.h / 100, PR.w.w * .9 / 80) + 'px');
@@ -334,14 +344,14 @@
       <circle cx="${cx}" cy="${cy}" r="${hubB}" fill="#000"/>`;
   }
 
-  // ================= Face 1: full-screen dial =================
-  // Ticks run along rays from the centre and end on the screen edge, so the dial follows the
-  // screen's rectangle. Sizes are fractions of U = the shorter side.
-  let A = null;
-  function buildA() {
-    const svg = $('svgA');
-    const W = SW, H = SH, U = Math.min(W, H);
-    if (!W || !H) return;
+  // ================= Face 1 (and the split face's square dial): rectangular dial =================
+  // Ticks run along rays from the centre and end on the W x H rectangle's edge, so the dial follows
+  // its shape. Sizes are fractions of U = the shorter side. sq = the compact square variant.
+  let A = null, Q = null;
+  function buildA() { A = buildRectDial($('svgA'), SW, SH, false); }
+  function buildRectDial(svg, W, H, sq) {
+    const U = Math.min(W, H);
+    if (!W || !H) return null;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     const cx = W / 2, cy = H / 2;
     let html = '';
@@ -351,44 +361,43 @@
                          Math.abs(sy) > 1e-6 ? (H / 2) / Math.abs(sy) : Infinity);
       const ox = cx + sx * t, oy = cy + sy * t;
       // the two numerals on the short axis get a short tick, the other two a long one
-      const shortAxis = W >= H ? (i === 0 || i === 30) : (i === 15 || i === 45);
+      const shortAxis = sq || (W >= H ? (i === 0 || i === 30) : (i === 15 || i === 45));
       let len, w, col;
       if (i % 15 === 0)     { len = shortAxis ? .05 * U : .19 * U; w = .0075 * U; col = 'var(--tick-major-a)'; }
-      else if (i % 5 === 0) { len = .18 * U;  w = .0075 * U; col = 'var(--tick-major-a)'; }
+      else if (i % 5 === 0) { len = (sq ? .15 : .18) * U;  w = .0075 * U; col = 'var(--tick-major-a)'; }
       else                  { len = .062 * U; w = .0055 * U; col = 'var(--tick-minor-a)'; }
       html += `<line x1="${fmt(ox)}" y1="${fmt(oy)}" x2="${fmt(ox - sx * len)}" y2="${fmt(oy - sy * len)}" stroke="${col}" stroke-width="${fmt(w)}" stroke-linecap="round"/>`;
     }
-    const fs = .125 * U;
+    const fs = (sq ? .12 : .125) * U;
     const num = (n, x, y) => `<text transform="translate(${fmt(x)} ${fmt(y)}) scale(1.3 1)" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" font-weight="600" fill="var(--white)">${n}</text>`;
     const land = W >= H;
-    const x3 = W - .284 * U, x9 = .29 * U;
-    const y12 = land ? .124 * U : .29 * U, y6 = land ? H - .112 * U : H - .29 * U;
+    const x3 = W - (sq ? .15 : .284) * U, x9 = (sq ? .15 : .29) * U;
+    const y12 = sq ? .19 * U : land ? .124 * U : .29 * U, y6 = sq ? H - .19 * U : land ? H - .112 * U : H - .29 * U;
     html += num(12, cx, y12) + num(3, x3, cy) + num(6, cx, y6) + num(9, x9, cy);
     html += `<text class="aDate" dominant-baseline="central" font-weight="500"><tspan fill="var(--red)" class="aDow"></tspan><tspan fill="var(--white)" class="aDay"></tspan></text>`;
     const L = land ? 1 : 1.35;   // longer hands on the taller portrait dial
     html += handSVG('hh', cx, cy, .065 * U, .012 * U, .26 * U * L, .038 * U, 'var(--white)');
-    html += handSVG('hm', cx, cy, .065 * U, .012 * U, .455 * U * (land ? 1 : .98), .038 * U, 'var(--white)');
-    html += secondSVG(cx, cy, .5 * U * (land ? 1 : .96), .088 * U, .006 * U, .024 * U, .015 * U, .006 * U);
+    html += handSVG('hm', cx, cy, .065 * U, .012 * U, .455 * U * (sq ? .97 : land ? 1 : .98), .038 * U, 'var(--white)');
+    html += secondSVG(cx, cy, .5 * U * (sq ? .96 : land ? 1 : .96), .088 * U, .006 * U, .024 * U, .015 * U, .006 * U);
     svg.innerHTML = html;
-    A = { cx, cy, h: svg.querySelector('.hh'), m: svg.querySelector('.hm'), s: svg.querySelector('.hs'),
-          dow: svg.querySelector('.aDow'), day: svg.querySelector('.aDay'), date: svg.querySelector('.aDate'),
-          g: { W, H, U, cx, cy, x3, y6, fs, land } };
     lastDateKey = '';
+    return { cx, cy, h: svg.querySelector('.hh'), m: svg.querySelector('.hm'), s: svg.querySelector('.hs'),
+             dow: svg.querySelector('.aDow'), day: svg.querySelector('.aDay'), date: svg.querySelector('.aDate'),
+             g: { W, H, U, cx, cy, x3, y6, fs, land, dateBase: (sq ? .044 : land ? .058 : .0725) * U } };
   }
 
   // The face-1 date goes right of the hub (landscape) or below it (portrait). On near-square screens the
   // preferred slot gets squeezed by the 3 / 6 numerals, so fall back to the other slot, then to a smaller font.
-  function placeDate() {
-    const t = A && A.date;
+  function placeDate(D) {
+    const t = D && D.date;
     if (!t) return;
-    const { U, cx, cy, x3, y6, fs, land } = A.g;
-    const base = .058 * U * (land ? 1 : 1.25);
+    const { U, cx, cy, x3, y6, fs, land, dateBase: base } = D.g;
     t.setAttribute('font-size', fmt(base));
     const len = t.getComputedTextLength() || base * 3.7;          // width at the base size
     const hub = .05 * U, gap = .03 * U, capH = .72;                // capH: cap height / font size
     const rL = cx + hub + gap, rR = x3 - .39 * fs - gap;           // right slot: hub .. left edge of "3"
     const bT = cy + hub + gap, bB = y6 - capH / 2 * fs - gap;      // below slot: hub .. top of "6"
-    const fitR = Math.min(1, (rR - rL) / len), fitB = Math.min(1, (bB - bT) / (capH * base), A.g.W * .8 / len);
+    const fitR = Math.min(1, (rR - rL) / len), fitB = Math.min(1, (bB - bT) / (capH * base), D.g.W * .8 / len);
     const useR = land ? (fitR >= 1 || fitR >= fitB) : (fitB < 1 && fitR > fitB);
     const size = base * (useR ? fitR : fitB);
     t.setAttribute('font-size', fmt(size));
@@ -427,7 +436,7 @@
   function drawHands(now, onlySeconds) {
     const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds(), ms = now.getMilliseconds();
     const sec = S.smooth ? s + ms / 1000 : s;
-    for (const d of [A, B]) {
+    for (const d of [A, B, Q]) {
       if (!d) continue;
       d.s.style.display = S.secs ? '' : 'none';
       if (S.secs) setRot(d.s, sec * 6, d.cx, d.cy);
@@ -439,8 +448,17 @@
 
   // ================= Calendar widget =================
   const wu = n => `calc(${fmt(n)} * var(--wu))`;
-  function renderCal(now) {
-    const y = now.getFullYear(), mo = now.getMonth(), today = now.getDate();
+  // ‹ › show other months; the calendar returns to the current month after a minute without taps.
+  let calOffset = 0, calTimer;
+  function shiftMonth(n) {
+    calOffset += n;
+    clearTimeout(calTimer);
+    if (calOffset) calTimer = setTimeout(() => { calOffset = 0; renderCal(new Date()); }, 60e3);
+    renderCal(new Date());
+  }
+  function renderCal(today0) {
+    const now = new Date(today0.getFullYear(), today0.getMonth() + calOffset, 1);
+    const y = now.getFullYear(), mo = now.getMonth(), today = calOffset ? 0 : today0.getDate();
     const ws = weekStart();
     const startDow = (new Date(y, mo, 1).getDay() - ws + 7) % 7;
     const days = new Date(y, mo + 1, 0).getDate();
@@ -449,7 +467,10 @@
     const colX = c => 6.6 + c * 11.2;   // cells span 0.75..79.25 of the 80-unit box, i.e. centred
     const isWe = c => { const d = (c + ws) % 7; return d === 0 || d === 6; };
     const letters = ['S','M','T','W','T','F','S'];
-    let html = `<div class="month" style="left:${wu(colX(0) - 2.8)}">${now.toLocaleDateString('en-US', { month: 'long' }).toUpperCase()}</div>`;
+    const mName = now.toLocaleDateString('en-US', { month: 'long' }).toUpperCase() + (y !== today0.getFullYear() ? ' ' + y : '');
+    let html = `<div class="month" style="left:${wu(colX(0) - 2.8)}">${mName}</div>` +
+      `<button class="nav" data-m="-1" aria-label="Previous month" style="left:${wu(colX(5))}"><svg viewBox="0 0 8 14"><path d="M6.5 1.5 1.5 7l5 5.5"/></svg></button>` +
+      `<button class="nav" data-m="1" aria-label="Next month" style="left:${wu(colX(6))}"><svg viewBox="0 0 8 14"><path d="M1.5 1.5 6.5 7l-5 5.5"/></svg></button>`;
     for (let c = 0; c < 7; c++) html += `<div class="cell dow${isWe(c) ? ' we' : ''}" style="left:${wu(colX(c))};top:${wu(dowY)}">${letters[(c + ws) % 7]}</div>`;
     for (let d = 1; d <= days; d++) {
       const idx = startDow + d - 1, c = idx % 7, r = Math.floor(idx / 7);
@@ -458,6 +479,11 @@
     }
     $('wCal').innerHTML = html;
   }
+
+  $('wCal').addEventListener('click', e => {
+    const b = e.target.closest('.nav');
+    if (b) { e.stopPropagation(); shiftMonth(+b.dataset.m); }
+  });
 
   // ================= Weather widget (Open-Meteo, no API key) =================
   const ICON = {
@@ -609,7 +635,7 @@
     const dKey = now.toDateString() + weekStart();
     if (dKey !== lastDateKey) {
       lastDateKey = dKey;
-      if (A) { A.dow.textContent = dowShort; A.day.textContent = ' ' + now.getDate(); placeDate(); }
+      for (const D of [A, Q]) if (D) { D.dow.textContent = dowShort; D.day.textContent = ' ' + now.getDate(); placeDate(D); }
       renderCal(now);
       $('dDate').innerHTML = `<b>${now.toLocaleDateString('en-US', { weekday: 'long' })}</b> ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`;
       $('wtD').innerHTML = `<b>${dowShort}</b> ${now.getDate()}`;
@@ -683,7 +709,7 @@
     uiTimer = setTimeout(() => document.body.classList.remove('ui'), 4000);
   }
   const overlayOpen = () => $('settings').classList.contains('open') || $('hint').classList.contains('show');
-  const clockTo = side => { if (S.clockSide !== side) { S.clockSide = side; save(); layout(); } };
+  const clockTo = side => { if (faces[S.face].id === 'fB' && S.clockSide !== side) { S.clockSide = side; save(); layout(); } };
   const swapSides = () => clockTo(S.clockSide === 'right' ? 'left' : 'right');
   // Which split-face pane ('c' clock, 'w' widgets) is under a point in #rot coordinates?
   function paneAt(sx, sy) {
@@ -694,7 +720,7 @@
   }
   let tx = null, ty = null, lastTap = 0, lastTouchEnd = 0;
   window.addEventListener('touchstart', e => {
-    if (overlayOpen()) { tx = null; return; }
+    if (overlayOpen() || e.target.closest('.nav')) { tx = null; return; }
     tx = e.touches[0].clientX; ty = e.touches[0].clientY;
   }, { passive: true });
   window.addEventListener('touchend', e => {
@@ -720,7 +746,7 @@
   }, { passive: true });
   window.addEventListener('dblclick', e => {
     const [sx, sy] = toStage(e.clientX, e.clientY);
-    if (!overlayOpen() && paneAt(sx, sy) && Date.now() - lastTouchEnd > 1000) swapSides();   // mouse only; touch handled above
+    if (!overlayOpen() && !e.target.closest('.nav') && paneAt(sx, sy) && Date.now() - lastTouchEnd > 1000) swapSides();   // mouse only; touch handled above
   });
   window.addEventListener('mousedown', () => { if (!overlayOpen()) showUI(); requestWakeLock(); });
   // Desktop keyboard controls (listed in Settings and the README).
@@ -748,6 +774,7 @@
       l: () => setFace(S.face + 1), h: () => setFace(S.face - 1),
       ArrowDown: () => setWidget(S.widget + 1), ArrowUp: () => setWidget(S.widget - 1),
       j: () => setWidget(S.widget + 1), k: () => setWidget(S.widget - 1),
+      '[': () => shiftMonth(-1), ']': () => shiftMonth(1),
       s: openSettings, ',': openSettings, f: toggleFullscreen
     }[k] || (/^[1-9]$/.test(k) && +k <= faces.length ? () => setFace(+k - 1) : null);
     if (!act) return;
@@ -786,8 +813,8 @@
       `${wakeMsg || 'Screen wake lock: not requested yet'}<br>` +
       (standalone ? 'Running as Home Screen app ✓' : 'Running in a browser tab. Use Share → Add to Home Screen for full-screen mode.') +
       `<br>Settings are saved on this phone and kept between launches.` +
-      `<br>Swipe left/right to change faces. On the split face, swipe up/down over the clock (analog ↔ digital) or over the widgets (weather ↔ calendar). Double-tap it to swap the clock's side.` +
-      `<br>Keyboard: ← → or 1–${faces.length} faces · ↑ ↓ widgets · Shift+↑ ↓ analog/digital · Shift+← → clock side · S settings · F full screen · Esc close.`;
+      `<br>Swipe left/right to change faces. On the split face, swipe up/down over the clock (round / square / digital) or over the widgets (weather ↔ calendar). Double-tap it to swap the clock's side.` +
+      `<br>Keyboard: ← → or 1–${faces.length} faces · ↑ ↓ widgets · Shift+↑ ↓ clock style · Shift+← → clock side · [ ] month · S settings · F full screen · Esc close.`;
   }
   function applySettings() {
     root.style.setProperty('--day-opacity', S.dim);
