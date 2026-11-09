@@ -25,7 +25,7 @@ Unofficial project, not affiliated with or endorsed by Apple. The faces are orig
 - **Stays on.** Uses the Screen Wake Lock API, so the screen doesn't auto-lock while the clock is open.
 - **Three faces.** Swipe left or right to switch:
   1. **Full-screen dial:** ticks run out to the screen edges, with big 12 / 3 / 6 / 9 numerals and the date.
-  2. **Clock + widgets:** an analog clock beside a stack you **swipe up and down**: weather, calendar, digital time.
+  2. **Clock + widgets:** two halves you each **swipe up and down**: the clock (analog / digital) and the widgets (weather / calendar). Choose which side the clock is on.
   3. **Big digital clock.**
 - **Night mode.** Everything turns dim red during set hours (22:30 to 07:00 by default), or always on, or off.
 - **Burn-in protection:**
@@ -34,7 +34,9 @@ Unofficial project, not affiliated with or endorsed by Apple. The faces are orig
   - The widget stack rotates every 10 minutes (adjustable).
   - Optionally rotate through the faces too.
 - **Orientation setting:** follow the phone, always landscape (either direction), or always portrait. This works even with iOS rotation lock on.
-- **Weather:** current location, or a city you type in. Free, no account.
+- **Weather:** current location, or search for a city (suggestions as you type). Free, no account.
+- **Calendar** starts the week on the day that's usual in the weather location's country (Sunday in the US, Monday in Europe, …), or pick it yourself.
+- **Safe area:** in portrait the clock stays clear of the notch / Dynamic Island, the status bar and the home indicator.
 - **No browser UI.** Opened from the Home Screen, it runs full-screen like a real app.
 
 ## Install on your iPhone (1 minute)
@@ -51,7 +53,7 @@ Unofficial project, not affiliated with or endorsed by Apple. The faces are orig
 
 **Using it:**
 - **Swipe left / right** to change faces.
-- On the clock + widgets face, **swipe up / down** over the widgets.
+- On the clock + widgets face, **swipe up / down** over the clock (analog ↔ digital) or over the widgets (weather ↔ calendar).
 - **Tap** to show the ⚙︎ settings button.
 
 ## Settings
@@ -63,12 +65,16 @@ Unofficial project, not affiliated with or endorsed by Apple. The faces are orig
 | Second hand / Smooth sweep | Show the orange second hand; sweep smoothly or tick. |
 | Day / Night brightness | Extra dimming on top of the phone's brightness. |
 | Night mode, starts, ends | Auto (by schedule), always on, or off. |
-| Weather city / Units | Leave the city blank to use your location. °C or °F. |
-| Week starts | Sunday or Monday for the calendar. |
+| Weather location / Units | Search for a city and pick it from the suggestions, or tap *📍 My location*. °C or °F. |
+| Week starts | *Auto* (from the weather location's country), Sunday, Monday or Saturday. |
+| Clock side | Put the clock on the left / top or right / bottom of the split face. |
 | Rotate widgets / faces | Minutes between automatic changes (0 = off). Helps against burn-in. |
 | Pixel shift every / range | How often and how far the face moves. |
 
 ## Things to know
+
+- **Settings are remembered.** They're saved on the phone and survive closing the app and restarting the phone. The Home Screen app and a Safari tab keep separate settings. Deleting the Home Screen icon deletes its settings.
+- **No location prompt?** iOS only asks if *Settings → Privacy & Security → Location Services → Safari Websites* is set to *Ask Next Time* or *While Using the App*. If it's *Never*, the request fails silently. Change it, then tap *📍 My location* in the clock's settings. Or just search for your city.
 
 - **Status bar in portrait:** in portrait, iOS always shows its own time and battery at the top of a Home Screen app. Web apps can't hide it. In landscape it's hidden.
 - **Battery health:** a phone sitting at 100% on a warm MagSafe charger all day ages its battery faster. Keep *Optimized Battery Charging* on. iPhone 15 and newer can also set an 80% limit.
@@ -80,7 +86,7 @@ Unofficial project, not affiliated with or endorsed by Apple. The faces are orig
 There's no server, account, analytics or tracking. This is a static page on GitHub Pages.
 
 - Settings are stored only on your phone, in `localStorage`.
-- For weather, your phone talks directly to [Open-Meteo](https://open-meteo.com/) (the forecast) and, with location on, [BigDataCloud](https://www.bigdatacloud.com/) (your town's name). Coordinates go only to those services.
+- For weather, your phone talks directly to [Open-Meteo](https://open-meteo.com/) (the forecast and city search) and, with location on, [BigDataCloud](https://www.bigdatacloud.com/) (your town's name). Coordinates go only to those services.
 
 ## For developers
 
@@ -110,7 +116,7 @@ Then open http://localhost:8000. In a desktop browser, arrow keys change faces a
 4. Use the colour variables (`--white`, `--red`, `--second`, …) so night mode recolours it for free.
 5. If it needs a portrait layout, add rules under `body.portrait`.
 
-**Add a widget:** add a `.widget` div inside `#trackB` and size it with `var(--wu)`, which is 1% of the widget area's height.
+**Add a widget:** add `<div class="pv"><div class="wbox …"></div></div>` inside `#trackB` and size its contents with `var(--wu)`. A widget is an 80 × 100 `--wu` box, scaled to fit and centred in its half of the screen. Clock views go in `#trackC` and use `var(--cu)`.
 
 Pushing to `main` redeploys GitHub Pages in about a minute. Phones pick up the new version the next time the app is opened.
 
