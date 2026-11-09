@@ -47,8 +47,9 @@
 
   /* #rot is the clock's "screen". It is rotated 90° when the chosen orientation differs from the phone's. */
   #rot { position: fixed; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; background: #000; }
+  /* #stage is the safe-area part of #rot (JS sets left/top/width/height), so notches and the status bar get a black margin. */
   #stage {
-    position: absolute; inset: 0;
+    position: absolute; left: 0; top: 0; width: 100%; height: 100%;
     transform: translate(var(--shift-x), var(--shift-y));
     transition: transform 2s ease-in-out, opacity 3s ease;
     opacity: var(--day-opacity);
@@ -62,13 +63,13 @@
   /* ---------- Face 1: full-screen dial ---------- */
   #svgA { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-  /* ---------- Face 2: dial + widget stack ---------- */
-  #dialB { position: absolute; overflow: visible; }   /* size/position set in JS */
-  #stackB { position: absolute; left: calc(54.7 * var(--vw) - 5 * var(--vh)); right: 0; top: 0; bottom: 0; overflow: hidden; }
-  body.portrait #stackB { left: 0; top: calc(50 * var(--vh)); }
-  #trackB { position: absolute; inset: 0; transition: transform .55s cubic-bezier(.25,.8,.25,1); }
-  .widget { position: absolute; left: calc(5 * var(--wu)); right: 0; height: 100%; }
-  body.portrait .widget { left: calc(7 * var(--vw)); }
+  /* ---------- Face 2: two swipeable panes: clock (analog/digital) and widgets (weather/calendar) ---------- */
+  /* Pane rects are set in JS. --cu / --wu are 1% of each pane's fitted content box. */
+  .pane { position: absolute; overflow: hidden; }
+  .track { position: absolute; inset: 0; transition: transform .55s cubic-bezier(.25,.8,.25,1); }
+  .pv { position: absolute; left: 0; width: 100%; height: 100%; }
+  #dialB, #svgQ { position: absolute; overflow: visible; }   /* size/position set in JS */
+  .wbox { position: absolute; left: 50%; top: 50%; width: calc(80 * var(--wu)); height: calc(100 * var(--wu)); margin: calc(-50 * var(--wu)) 0 0 calc(-40 * var(--wu)); }
 
   .w-weather .city { position: absolute; top: calc(7.6 * var(--wu)); left: calc(1.1 * var(--wu)); font-size: calc(9.2 * var(--wu)); font-weight: 600; line-height: 1; white-space: nowrap; display: flex; align-items: center; gap: calc(2.2 * var(--wu)); }
   .w-weather .city svg { width: calc(5.4 * var(--wu)); height: calc(5.4 * var(--wu)); fill: var(--white); }
@@ -81,21 +82,25 @@
 
   .w-cal .month { position: absolute; top: calc(9.4 * var(--wu)); left: calc(-0.4 * var(--wu)); font-size: calc(6.4 * var(--wu)); font-weight: 600; color: var(--red); line-height: 1; letter-spacing: .01em; }
   .w-cal .cell { position: absolute; width: calc(11.7 * var(--wu)); height: calc(11.7 * var(--wu)); margin: calc(-5.85 * var(--wu)) 0 0 calc(-5.85 * var(--wu)); display: flex; align-items: center; justify-content: center; font-size: calc(5.9 * var(--wu)); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .w-cal .nav { position: absolute; top: calc(6.6 * var(--wu)); width: calc(11 * var(--wu)); height: calc(11 * var(--wu)); margin-left: calc(-5.5 * var(--wu));
+                background: none; border: 0; padding: 0; display: flex; align-items: center; justify-content: center; opacity: .38; cursor: pointer; }
+  .w-cal .nav svg { width: calc(3.6 * var(--wu)); height: calc(6 * var(--wu)); fill: none; stroke: var(--gray); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .w-cal .nav:active { opacity: .8; }
   .w-cal .dow { font-size: calc(5 * var(--wu)); font-weight: 500; }
   .w-cal .we { color: var(--gray); }
   .w-cal .today::before { content: ""; position: absolute; width: calc(10.4 * var(--wu)); height: calc(10.4 * var(--wu)); border-radius: 50%; background: var(--red); z-index: -1; }
   .w-cal .today { color: #fff; z-index: 0; }
   body.night .w-cal .today { color: #000; }
 
-  .w-time .t { position: absolute; top: calc(18 * var(--wu)); left: 0; font-size: calc(42 * var(--wu)); font-weight: 600; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-  .w-time .d { position: absolute; top: calc(72 * var(--wu)); left: calc(1.2 * var(--wu)); font-size: calc(8.8 * var(--wu)); font-weight: 600; line-height: 1; }
+  .w-time { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .w-time .t { font-size: calc(42 * var(--cu)); font-weight: 600; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .w-time .d { margin-top: calc(7 * var(--cu)); font-size: calc(8.8 * var(--cu)); font-weight: 600; line-height: 1; }
   .w-time .d b { color: var(--red); font-weight: 600; }
 
-  #vdots { position: absolute; right: calc(1.6 * var(--vh)); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: calc(1.2 * var(--vh)); opacity: 0; transition: opacity .5s; }
-  body.portrait #vdots { top: 75%; right: calc(2 * var(--vw)); }
-  #vdots span { width: 7px; height: 7px; border-radius: 50%; background: #3a3a3c; }
-  #vdots span.on { background: #f2f2f7; }
-  #vdots.show { opacity: 1; }
+  .vdots { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; opacity: 0; transition: opacity .5s; }
+  .vdots span { width: 7px; height: 7px; border-radius: 50%; background: #3a3a3c; }
+  .vdots span.on { background: #f2f2f7; }
+  .vdots.show { opacity: 1; }
 
   /* ---------- Face 3: big digital ---------- */
   #fD .wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -115,7 +120,6 @@
     position: absolute; top: 14px; right: 16px; width: 40px; height: 40px; border-radius: 50%; border: 0;
     background: #1c1c1e; color: #f2f2f7; font-size: 20px; opacity: 0; pointer-events: none; transition: opacity .4s; z-index: 5;
   }
-  body.portrait #gear { top: 56px; }
   body.ui #gear { opacity: 1; pointer-events: auto; }
 
   #settings { position: absolute; inset: 0; background: rgba(0,0,0,.82); display: none; align-items: center; justify-content: center; z-index: 10; touch-action: pan-y; }
@@ -135,6 +139,15 @@
   #settings input[type=text] { width: 150px; }
   #settings input[type=range] { width: 130px; }
   #settings input[type=checkbox] { width: 22px; height: 22px; accent-color: #30d158; }
+  #settings .cityrow { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
+  #settings .cityctl { display: flex; gap: 8px; align-items: center; }
+  #settings .cityctl input[type=text] { flex: 1; width: auto; min-width: 0; }
+  #settings .btn2 { background: #2c2c2e; color: #f2f2f7; border: 0; border-radius: 8px; padding: 7px 10px; font-size: 15px; white-space: nowrap; }
+  #citySug { display: flex; flex-direction: column; background: #2c2c2e; border-radius: 8px; overflow: hidden; }
+  #citySug:empty { display: none; }
+  #citySug button { background: none; border: 0; border-top: 1px solid #3a3a3c; color: #f2f2f7; text-align: left; padding: 9px 10px; font-size: 15px; font-family: inherit; }
+  #citySug button:first-child { border-top: 0; }
+  #citySug small, #settings .small { color: #8e8e93; font-size: 13px; }
   #settings .status { grid-column: 1 / -1; font-size: 13px; color: #8e8e93; line-height: 1.45; margin-top: 4px; }
   #settings .close, #hint button { background: #0a84ff; color: #fff; border: 0; border-radius: 10px; padding: 7px 16px; font-size: 15px; font-weight: 600; }
 
@@ -148,21 +161,30 @@
 </style>
 </head>
 <body>
+<div id="safe" style="position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)"></div>
 
 <div id="rot">
   <div id="stage">
     <!-- Face 1: full-screen dial -->
     <section class="face" id="fA"><svg id="svgA"></svg></section>
 
-    <!-- Face 2: dial + vertically swipeable widget stack -->
+    <!-- Face 2: clock pane (analog / digital) + widget pane (weather / calendar), each swipeable up/down -->
     <section class="face" id="fB">
-      <svg id="dialB" viewBox="-100 -100 200 200"></svg>
-      <div id="stackB"><div id="trackB">
-        <div class="widget w-weather" id="wWeather"></div>
-        <div class="widget w-cal" id="wCal"></div>
-        <div class="widget w-time" id="wTime"><div class="t" id="wtT"></div><div class="d" id="wtD"></div></div>
-      </div></div>
-      <div id="vdots"></div>
+      <div class="pane" id="paneC">
+        <div class="track" id="trackC">
+          <div class="pv"><svg id="dialB" viewBox="-100 -100 200 200"></svg></div>
+          <div class="pv"><svg id="svgQ" class="dialQ"></svg></div>
+          <div class="pv w-time"><div class="t" id="wtT"></div><div class="d" id="wtD"></div></div>
+        </div>
+        <div class="vdots" id="dotsC"></div>
+      </div>
+      <div class="pane" id="paneW">
+        <div class="track" id="trackB">
+          <div class="pv"><div class="wbox w-weather" id="wWeather"></div></div>
+          <div class="pv"><div class="wbox w-cal" id="wCal"></div></div>
+        </div>
+        <div class="vdots" id="dotsW"></div>
+      </div>
     </section>
 
     <!-- Face 3: big digital -->
@@ -193,9 +215,16 @@
       <label>Night brightness <input type="range" id="sNightDim" min="0.15" max="0.8" step="0.05"></label>
       <label>Night starts <input type="time" id="sNightStart"></label>
       <label>Night ends <input type="time" id="sNightEnd"></label>
-      <label>Weather city <input type="text" id="sCity" placeholder="Current location"></label>
+      <div class="cityrow">
+        <div>Weather location <span class="small" id="cityNow"></span></div>
+        <div class="cityctl">
+          <input type="text" id="sCity" placeholder="Search for a city…" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
+          <button class="btn2" id="sHere">📍 My location</button>
+        </div>
+        <div id="citySug"></div>
+      </div>
       <label>Units <select id="sUnits"><option value="C">°C</option><option value="F">°F</option></select></label>
-      <label>Week starts <select id="sWeek"><option value="0">Sunday</option><option value="1">Monday</option></select></label>
+      <label>Week starts <select id="sWeek"><option value="auto">Auto (from location)</option><option value="0">Sunday</option><option value="1">Monday</option><option value="6">Saturday</option></select></label>
       <label>Rotate widgets (min, 0=off) <input type="number" id="sWRotate" min="0" max="240"></label>
       <label>Pixel shift every (s) <input type="number" id="sShiftEvery" min="10" max="600"></label>
       <label>Shift range (px) <input type="number" id="sShiftPx" min="0" max="30"></label>
@@ -219,13 +248,15 @@
   const DEFAULTS = {
     orient: 'follow', h24: true, secs: true, smooth: true, dim: 1,
     night: 'auto', nightDim: 0.45, nightStart: '22:30', nightEnd: '07:00',
-    city: '', units: 'C', week: 0, wRotate: 10,
-    shiftEvery: 60, shiftPx: 8, rotateMin: 0, face: 0, widget: 0
+    city: '', place: null, units: 'C', week: 'auto', wRotate: 10, clockSide: 'left',
+    shiftEvery: 60, shiftPx: 8, rotateMin: 0, face: 0, widget: 0, clockView: 0, v: 3
   };
   const KEY = 'standbyclock';
   let S = { ...DEFAULTS };
   try { S = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+  if (S.v !== 2 && S.v !== 3) { S.week = 'auto'; S.widget = 0; S.v = 2; }   // v1 had a fixed Sunday default and 3 widgets
+  if (S.v === 2) { if (S.clockView === 1) S.clockView = 2; S.v = 3; save(); }  // v2 clock views: analog, digital
 
   const $ = id => document.getElementById(id);
   const root = document.documentElement;
@@ -235,7 +266,14 @@
 
   // ================= Orientation / layout =================
   // rot: 0 = none, 90 = rotated clockwise, -90 = counter-clockwise.
-  let rot = 0, SW = 0, SH = 0, portrait = false;
+  // SW/SH = size of the safe-area clock area (#stage); ins = its insets inside #rot.
+  let rot = 0, SW = 0, SH = 0, portrait = false, ins = { t: 0, r: 0, b: 0, l: 0 };
+  const PR = { c: { x: 0, y: 0, w: 0, h: 0 }, w: { x: 0, y: 0, w: 0, h: 0 } };   // split-face pane rects in stage coords
+  function screenInsets() {
+    const cs = getComputedStyle($('safe'));
+    return { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
+  }
+  const place = (el, r) => Object.assign(el.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
   function layout() {
     const w = innerWidth, h = innerHeight;
     const phoneLand = w > h;
@@ -244,21 +282,41 @@
     else want = S.orient === 'portrait' ? 'port' : 'land';
     rot = 0;
     if ((want === 'land') !== phoneLand) rot = S.orient === 'landscape-ccw' ? -90 : (S.orient === 'portrait' ? -90 : 90);
-    SW = rot ? h : w; SH = rot ? w : h;
+    const RW = rot ? h : w, RH = rot ? w : h;
     const r = $('rot');
-    r.style.width = SW + 'px'; r.style.height = SH + 'px';
+    r.style.width = RW + 'px'; r.style.height = RH + 'px';
     r.style.transform = rot === 90 ? `translate(${w}px,0) rotate(90deg)` : rot === -90 ? `translate(0,${h}px) rotate(-90deg)` : 'none';
-    portrait = SW < SH;
+    portrait = RW < RH;
+    // Map the screen's safe-area insets (notch / Dynamic Island, status bar, home indicator) into #rot's frame.
+    const s = screenInsets();
+    const m = rot === 90 ? { t: s.r, r: s.b, b: s.l, l: s.t } : rot === -90 ? { t: s.l, r: s.t, b: s.r, l: s.b } : s;
+    // Portrait: keep clear of the top and bottom. Landscape: keep clear of the notch side, symmetrically so faces stay centred.
+    if (portrait) ins = { t: m.t, b: m.b, l: 0, r: 0 };
+    else { const x = Math.max(m.l, m.r); ins = { t: 0, b: 0, l: x, r: x }; }
+    SW = RW - ins.l - ins.r; SH = RH - ins.t - ins.b;
+    place($('stage'), { x: ins.l, y: ins.t, w: SW, h: SH });
+    $('gear').style.top = (ins.t + (portrait ? 8 : 14)) + 'px';
+    $('gear').style.right = (ins.r + 16) + 'px';
+    $('dots').style.bottom = Math.max(12, ins.b) + 'px';
     document.body.classList.toggle('portrait', portrait);
     root.style.setProperty('--vh', SH / 100 + 'px');
     root.style.setProperty('--vw', SW / 100 + 'px');
-    root.style.setProperty('--wu', (portrait ? SH * .5 : SH) / 100 + 'px');
-    // dial on the split face
-    const d = $('dialB');
-    let size, cx, cy;
-    if (portrait) { size = Math.min(SW * .88, SH * .46); cx = SW / 2; cy = SH * .265; }
-    else { size = SH * .86; cx = SW * .275; cy = SH * .512; }
-    Object.assign(d.style, { width: size + 'px', height: size + 'px', left: (cx - size / 2) + 'px', top: (cy - size / 2) + 'px' });
+    // Split face: two equal halves (side by side in landscape, stacked in portrait); the clock takes the chosen side.
+    const halves = portrait
+      ? [{ x: 0, y: 0, w: SW, h: SH / 2 }, { x: 0, y: SH / 2, w: SW, h: SH / 2 }]
+      : [{ x: 0, y: 0, w: SW / 2, h: SH }, { x: SW / 2, y: 0, w: SW / 2, h: SH }];
+    const clockFirst = S.clockSide !== 'right';
+    PR.c = halves[clockFirst ? 0 : 1]; PR.w = halves[clockFirst ? 1 : 0];
+    place($('paneC'), PR.c); place($('paneW'), PR.w);
+    const size = Math.min(PR.c.w * .9, PR.c.h * .86);
+    Object.assign($('dialB').style, { width: size + 'px', height: size + 'px', left: (PR.c.w - size) / 2 + 'px', top: (PR.c.h - size) / 2 + 'px' });
+    const qs = Math.min(PR.c.w * .92, PR.c.h * .9);
+    Object.assign($('svgQ').style, { width: qs + 'px', height: qs + 'px', left: (PR.c.w - qs) / 2 + 'px', top: (PR.c.h - qs) / 2 + 'px' });
+    $('svgQ').setAttribute('viewBox', `0 0 ${qs} ${qs}`);
+    Q = buildRectDial($('svgQ'), qs, qs, true);
+    // Content boxes are scaled to fit their pane in both directions: digital time ~115 x 100 units, widgets 80 x 100.
+    $('paneC').style.setProperty('--cu', Math.min(PR.c.h / 100, PR.c.w * .92 / 115) + 'px');
+    $('paneW').style.setProperty('--wu', Math.min(PR.w.h / 100, PR.w.w * .9 / 80) + 'px');
     buildA();
     const now = new Date();
     lastDateKey = '';
@@ -286,14 +344,14 @@
       <circle cx="${cx}" cy="${cy}" r="${hubB}" fill="#000"/>`;
   }
 
-  // ================= Face 1: full-screen dial =================
-  // Ticks run along rays from the centre and end on the screen edge, so the dial follows the
-  // screen's rectangle. Sizes are fractions of U = the shorter side.
-  let A = null;
-  function buildA() {
-    const svg = $('svgA');
-    const W = SW, H = SH, U = Math.min(W, H);
-    if (!W || !H) return;
+  // ================= Face 1 (and the split face's square dial): rectangular dial =================
+  // Ticks run along rays from the centre and end on the W x H rectangle's edge, so the dial follows
+  // its shape. Sizes are fractions of U = the shorter side. sq = the compact square variant.
+  let A = null, Q = null;
+  function buildA() { A = buildRectDial($('svgA'), SW, SH, false); }
+  function buildRectDial(svg, W, H, sq) {
+    const U = Math.min(W, H);
+    if (!W || !H) return null;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     const cx = W / 2, cy = H / 2;
     let html = '';
@@ -303,31 +361,58 @@
                          Math.abs(sy) > 1e-6 ? (H / 2) / Math.abs(sy) : Infinity);
       const ox = cx + sx * t, oy = cy + sy * t;
       // the two numerals on the short axis get a short tick, the other two a long one
-      const shortAxis = W >= H ? (i === 0 || i === 30) : (i === 15 || i === 45);
+      const shortAxis = sq || (W >= H ? (i === 0 || i === 30) : (i === 15 || i === 45));
       let len, w, col;
       if (i % 15 === 0)     { len = shortAxis ? .05 * U : .19 * U; w = .0075 * U; col = 'var(--tick-major-a)'; }
-      else if (i % 5 === 0) { len = .18 * U;  w = .0075 * U; col = 'var(--tick-major-a)'; }
+      else if (i % 5 === 0) { len = (sq ? .15 : .18) * U;  w = .0075 * U; col = 'var(--tick-major-a)'; }
       else                  { len = .062 * U; w = .0055 * U; col = 'var(--tick-minor-a)'; }
       html += `<line x1="${fmt(ox)}" y1="${fmt(oy)}" x2="${fmt(ox - sx * len)}" y2="${fmt(oy - sy * len)}" stroke="${col}" stroke-width="${fmt(w)}" stroke-linecap="round"/>`;
     }
-    const fs = .125 * U;
+    const fs = (sq ? .12 : .125) * U;
     const num = (n, x, y) => `<text transform="translate(${fmt(x)} ${fmt(y)}) scale(1.3 1)" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" font-weight="600" fill="var(--white)">${n}</text>`;
-    const land = W >= H;
-    const x3 = W - .284 * U, x9 = .29 * U;
-    const y12 = land ? .124 * U : .29 * U, y6 = land ? H - .112 * U : H - .29 * U;
+    const land = sq || W >= H * .87;   // near-square portrait screens use the landscape layout too
+    // 3 / 9: on near-square screens push them out so the date still fits between the hub and the 3.
+    let x3 = W - .284 * U, x9 = .29 * U;
+    if (sq) { x3 = W - .15 * U; x9 = .15 * U; }
+    else if (land) { x3 = Math.min(W - .15 * U, Math.max(x3, cx + .36 * U)); x9 = Math.max(.15 * U, Math.min(x9, cx - .36 * U)); }
+    const y12 = sq ? .19 * U : land ? .124 * U : .29 * U, y6 = sq ? H - .19 * U : land ? H - .112 * U : H - .29 * U;
     html += num(12, cx, y12) + num(3, x3, cy) + num(6, cx, y6) + num(9, x9, cy);
-    const dateAttrs = land
-      ? `x="${fmt(x3 - .142 * U)}" y="${fmt(cy)}" text-anchor="end"`
-      : `x="${fmt(cx)}" y="${fmt(cy + .3 * U)}" text-anchor="middle"`;
-    html += `<text ${dateAttrs} dominant-baseline="central" font-size="${fmt(.058 * U * (land ? 1 : 1.25))}" font-weight="500"><tspan fill="var(--red)" class="aDow"></tspan><tspan fill="var(--white)" class="aDay"></tspan></text>`;
+    if (!sq) html += `<text class="aDate" dominant-baseline="central" font-weight="500"><tspan fill="var(--red)" class="aDow"></tspan><tspan fill="var(--white)" class="aDay"></tspan></text>`;
     const L = land ? 1 : 1.35;   // longer hands on the taller portrait dial
     html += handSVG('hh', cx, cy, .065 * U, .012 * U, .26 * U * L, .038 * U, 'var(--white)');
-    html += handSVG('hm', cx, cy, .065 * U, .012 * U, .455 * U * (land ? 1 : .98), .038 * U, 'var(--white)');
-    html += secondSVG(cx, cy, .5 * U * (land ? 1 : .96), .088 * U, .006 * U, .024 * U, .015 * U, .006 * U);
+    html += handSVG('hm', cx, cy, .065 * U, .012 * U, .455 * U * (sq ? .97 : land ? 1 : .98), .038 * U, 'var(--white)');
+    html += secondSVG(cx, cy, .5 * U * (sq ? .96 : land ? 1 : .96), .088 * U, .006 * U, .024 * U, .015 * U, .006 * U);
     svg.innerHTML = html;
-    A = { cx, cy, h: svg.querySelector('.hh'), m: svg.querySelector('.hm'), s: svg.querySelector('.hs'),
-          dow: svg.querySelector('.aDow'), day: svg.querySelector('.aDay') };
     lastDateKey = '';
+    return { cx, cy, h: svg.querySelector('.hh'), m: svg.querySelector('.hm'), s: svg.querySelector('.hs'),
+             dow: svg.querySelector('.aDow'), day: svg.querySelector('.aDay'), date: svg.querySelector('.aDate'),
+             g: { W, H, U, cx, cy, x3, y6, fs, land, dateBase: (sq ? .044 : land ? .058 : .0725) * U } };
+  }
+
+  // The face-1 date goes right of the hub (landscape) or below it (portrait). On near-square screens the
+  // preferred slot gets squeezed by the 3 / 6 numerals, so fall back to the other slot, then to a smaller font.
+  function placeDate(D) {
+    const t = D && D.date;
+    if (!t) return;
+    const { U, cx, cy, x3, y6, fs, land, dateBase: base } = D.g;
+    t.setAttribute('font-size', fmt(base));
+    const len = t.getComputedTextLength() || base * 3.7;          // width at the base size
+    const hub = .05 * U, gap = .03 * U, capH = .72;                // capH: cap height / font size
+    const rL = cx + hub + gap, rR = x3 - .39 * fs - gap;           // right slot: hub .. left edge of "3"
+    const bT = cy + hub + gap, bB = y6 - capH / 2 * fs - gap;      // below slot: hub .. top of "6"
+    const fitR = Math.min(1, (rR - rL) / len), fitB = Math.min(1, (bB - bT) / (capH * base), D.g.W * .8 / len);
+    // Landscape / square: always on the 9-3 line (shrunk to fit if needed). Portrait: above the 6.
+    const useR = land || (fitB < 1 && fitR > fitB);
+    const size = base * (useR ? fitR : fitB);
+    t.setAttribute('font-size', fmt(size));
+    if (useR) {
+      const x = Math.max(rL + len * size / base, Math.min(x3 - .142 * U, rR));   // original spot when it fits
+      t.setAttribute('x', fmt(x)); t.setAttribute('y', fmt(cy)); t.setAttribute('text-anchor', 'end');
+    } else {
+      const half = capH * size / 2;
+      const y = Math.min(cy + .3 * U, bB - half);                  // original spot when it fits
+      t.setAttribute('x', fmt(cx)); t.setAttribute('y', fmt(Math.max(bT + half, y))); t.setAttribute('text-anchor', 'middle');
+    }
   }
 
   // ================= Face 2: dial (viewBox -100..100, ticks end at r=98.5) =================
@@ -355,7 +440,7 @@
   function drawHands(now, onlySeconds) {
     const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds(), ms = now.getMilliseconds();
     const sec = S.smooth ? s + ms / 1000 : s;
-    for (const d of [A, B]) {
+    for (const d of [A, B, Q]) {
       if (!d) continue;
       d.s.style.display = S.secs ? '' : 'none';
       if (S.secs) setRot(d.s, sec * 6, d.cx, d.cy);
@@ -367,17 +452,29 @@
 
   // ================= Calendar widget =================
   const wu = n => `calc(${fmt(n)} * var(--wu))`;
-  function renderCal(now) {
-    const y = now.getFullYear(), mo = now.getMonth(), today = now.getDate();
-    const ws = Number(S.week);
+  // ‹ › show other months; the calendar returns to the current month after a minute without taps.
+  let calOffset = 0, calTimer;
+  function shiftMonth(n) {
+    calOffset += n;
+    clearTimeout(calTimer);
+    if (calOffset) calTimer = setTimeout(() => { calOffset = 0; renderCal(new Date()); }, 60e3);
+    renderCal(new Date());
+  }
+  function renderCal(today0) {
+    const now = new Date(today0.getFullYear(), today0.getMonth() + calOffset, 1);
+    const y = now.getFullYear(), mo = now.getMonth(), today = calOffset ? 0 : today0.getDate();
+    const ws = weekStart();
     const startDow = (new Date(y, mo, 1).getDay() - ws + 7) % 7;
     const days = new Date(y, mo + 1, 0).getDate();
     const weeks = Math.ceil((startDow + days) / 7);
     const rowH = weeks > 5 ? 10.6 : 12.4, firstRow = weeks > 5 ? 35.4 : 36.9, dowY = weeks > 5 ? 23.6 : 24.5;
-    const colX = c => 2.4 + c * 11.2;
+    const colX = c => 6.6 + c * 11.2;   // cells span 0.75..79.25 of the 80-unit box, i.e. centred
     const isWe = c => { const d = (c + ws) % 7; return d === 0 || d === 6; };
     const letters = ['S','M','T','W','T','F','S'];
-    let html = `<div class="month">${now.toLocaleDateString('en-US', { month: 'long' }).toUpperCase()}</div>`;
+    const mName = now.toLocaleDateString('en-US', { month: 'long' }).toUpperCase() + (y !== today0.getFullYear() ? ' ' + y : '');
+    let html = `<div class="month" style="left:${wu(colX(0) - 2.8)}">${mName}</div>` +
+      `<button class="nav" data-m="-1" aria-label="Previous month" style="left:${wu(colX(5))}"><svg viewBox="0 0 8 14"><path d="M6.5 1.5 1.5 7l5 5.5"/></svg></button>` +
+      `<button class="nav" data-m="1" aria-label="Next month" style="left:${wu(colX(6))}"><svg viewBox="0 0 8 14"><path d="M1.5 1.5 6.5 7l-5 5.5"/></svg></button>`;
     for (let c = 0; c < 7; c++) html += `<div class="cell dow${isWe(c) ? ' we' : ''}" style="left:${wu(colX(c))};top:${wu(dowY)}">${letters[(c + ws) % 7]}</div>`;
     for (let d = 1; d <= days; d++) {
       const idx = startDow + d - 1, c = idx % 7, r = Math.floor(idx / 7);
@@ -386,6 +483,11 @@
     }
     $('wCal').innerHTML = html;
   }
+
+  $('wCal').addEventListener('click', e => {
+    const b = e.target.closest('.nav');
+    if (b) { e.stopPropagation(); shiftMonth(+b.dataset.m); }
+  });
 
   // ================= Weather widget (Open-Meteo, no API key) =================
   const ICON = {
@@ -428,58 +530,100 @@
       `<div class="cond">${text}</div>` +
       `<div class="lohi">L:${Math.round(W.lo)}° H:${Math.round(W.hi)}°</div>`;
   }
+  const LANG = (navigator.language || 'en').split('-')[0];
   const getPos = () => new Promise((res, rej) => {
-    if (!navigator.geolocation) return rej(new Error('no geolocation'));
-    navigator.geolocation.getCurrentPosition(p => res(p.coords), rej, { maximumAge: 6 * 3600e3, timeout: 15000 });
+    if (!navigator.geolocation) return rej(new Error('this browser has no location support'));
+    navigator.geolocation.getCurrentPosition(p => res(p.coords), rej, { maximumAge: 3 * 3600e3, timeout: 20000, enableHighAccuracy: false });
   });
-  let weatherBusy = false;
-  async function loadWeather() {
-    if (weatherBusy) return;
+  const placeFrom = g => ({ name: g.name, lat: g.latitude, lon: g.longitude, cc: g.country_code || '',
+                            label: [g.name, g.admin1, g.country].filter((x, i, a) => x && a.indexOf(x) === i).join(', ') });
+  const geocode = async (q, count) => {
+    const g = await (await fetch(`https://geocoding-api.open-meteo.com/v1/search?count=${count}&language=${LANG}&format=json&name=${encodeURIComponent(q)}`)).json();
+    return g.results || [];
+  };
+  function locError(err) {
+    if (err && err.code === 1) return 'Location access is blocked. Allow it in iPhone Settings → Privacy & Security → Location Services → Safari Websites (“While Using the App” or “Ask Next Time”), then tap “📍 My location”. Or search for a city in Settings.';
+    if (err && err.code === 2) return 'Your location is unavailable right now. Search for a city in Settings instead.';
+    if (err && err.code === 3) return 'Getting your location timed out. Tap “📍 My location” in Settings to try again.';
+    return `Weather unavailable (${(err && err.message) || 'error'}).`;
+  }
+  let weatherBusy = false, weatherSeq = 0, weatherMsg = '';
+  // force: called from a tap, so the location prompt is tied to a user gesture and any running load is superseded.
+  async function loadWeather(force) {
+    if (weatherBusy && !force) return;
     weatherBusy = true;
+    const seq = ++weatherSeq;
     try {
-      let lat, lon, name, here = false;
-      if (S.city.trim()) {
-        const g = await (await fetch(`https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name=${encodeURIComponent(S.city.trim())}`)).json();
-        if (!g.results || !g.results.length) throw new Error(`City "${S.city}" not found`);
-        ({ latitude: lat, longitude: lon, name } = g.results[0]);
-      } else {
+      let lat, lon, name, cc, here = false;
+      if (!S.place && S.city.trim()) {   // settings from older versions: a typed city name only
+        const res = await geocode(S.city.trim(), 1);
+        if (!res.length) throw new Error(`city "${S.city}" not found`);
+        S.place = placeFrom(res[0]); save(); syncCityUI();
+      }
+      if (S.place) ({ lat, lon, name, cc } = S.place);
+      else {
+        weatherMsg = 'Asking for your location…'; renderStatus();
         const c = await getPos();
-        lat = c.latitude; lon = c.longitude; here = true;
+        lat = c.latitude; lon = c.longitude; here = true; name = 'My Location'; cc = '';
         try {
-          const r = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`)).json();
-          name = r.locality || r.city || r.principalSubdivision || 'My Location';
-        } catch (e) { name = 'My Location'; }
+          const r = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=${LANG}`)).json();
+          name = r.locality || r.city || r.principalSubdivision || name; cc = r.countryCode || '';
+        } catch (e) {}
       }
       const unit = S.units === 'F' ? '&temperature_unit=fahrenheit' : '';
       const f = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1${unit}`)).json();
-      W = { name, here, temp: f.current.temperature_2m, code: f.current.weather_code, wind: f.current.wind_speed_10m,
+      if (seq !== weatherSeq) return;
+      W = { name, here, cc, temp: f.current.temperature_2m, code: f.current.weather_code, wind: f.current.wind_speed_10m,
             isDay: !!f.current.is_day, lo: f.daily.temperature_2m_min[0], hi: f.daily.temperature_2m_max[0], at: Date.now() };
       try { localStorage.setItem(KEY + '.weather', JSON.stringify(W)); } catch (e) {}
-      renderWeather();
+      weatherMsg = '';
+      renderWeather(); syncCityUI();
+      lastDateKey = ''; updateText(new Date());   // the week start may depend on the location's country
     } catch (err) {
-      if (!W) renderWeather(err && err.code === 1
-        ? 'Location access denied. Enter a city in Settings (tap the screen, then ⚙︎).'
-        : `Weather unavailable (${(err && err.message) || 'error'}).`);
-    } finally { weatherBusy = false; }
+      if (seq !== weatherSeq) return;
+      weatherMsg = locError(err);
+      if (!W) renderWeather(weatherMsg);
+    } finally {
+      if (seq === weatherSeq) weatherBusy = false;
+      renderStatus();
+    }
   }
   setInterval(loadWeather, 20 * 60e3);
 
-  // ================= Widget stack =================
-  const widgets = [...document.querySelectorAll('#trackB .widget')];
-  widgets.forEach((w, i) => w.style.top = (i * 100) + '%');
-  $('vdots').innerHTML = widgets.map(() => '<span></span>').join('');
-  let dotsTimer;
-  function setWidget(i, show = true) {
-    S.widget = (i + widgets.length) % widgets.length;
-    $('trackB').style.transform = `translateY(${-S.widget * 100}%)`;
-    [...$('vdots').children].forEach((d, k) => d.classList.toggle('on', k === S.widget));
+  // ================= Week start (CLDR first day of week, by country) =================
+  const SUN_FIRST = 'AG AS BD BR BS BT BW BZ CA CN CO DM DO ET GT GU HK HN ID IL IN JM JP KE KH KR LA MH MM MO MT MX MZ NI NP PA PE PH PK PR PT PY SA SG SV TH TT TW UM US VE VI WS YE ZA ZW'.split(' ');
+  const SAT_FIRST = 'AE AF BH DJ DZ EG IQ IR JO KW LY OM QA SD SY'.split(' ');
+  function weekStart() {
+    if (S.week !== 'auto') return Number(S.week) || 0;
+    let cc = S.place ? S.place.cc : (W && W.here ? W.cc : '');
+    if (!cc) cc = ((navigator.language || '').match(/-([A-Za-z]{2})\b/) || [])[1] || '';
+    cc = cc.toUpperCase();
+    return SUN_FIRST.includes(cc) ? 0 : SAT_FIRST.includes(cc) ? 6 : cc === 'MV' ? 5 : 1;
+  }
+
+  // ================= Swipeable stacks on the split face =================
+  const stacks = {
+    c: { key: 'clockView', track: $('trackC'), dots: $('dotsC') },
+    w: { key: 'widget', track: $('trackB'), dots: $('dotsW') }
+  };
+  for (const st of Object.values(stacks)) {
+    st.n = st.track.children.length;
+    [...st.track.children].forEach((el, i) => el.style.top = (i * 100) + '%');
+    st.dots.innerHTML = '<span></span>'.repeat(st.n);
+  }
+  function setStack(k, i, show = true) {
+    const st = stacks[k];
+    S[st.key] = ((i % st.n) + st.n) % st.n;
+    st.track.style.transform = `translateY(${-S[st.key] * 100}%)`;
+    [...st.dots.children].forEach((d, j) => d.classList.toggle('on', j === S[st.key]));
     if (show) {
-      $('vdots').classList.add('show');
-      clearTimeout(dotsTimer);
-      dotsTimer = setTimeout(() => $('vdots').classList.remove('show'), 1800);
+      st.dots.classList.add('show');
+      clearTimeout(st.timer);
+      st.timer = setTimeout(() => st.dots.classList.remove('show'), 1800);
     }
     save();
   }
+  const setWidget = (i, show) => setStack('w', i, show);
   let wRotTimer;
   function startWidgetRotate() {
     clearInterval(wRotTimer);
@@ -492,10 +636,10 @@
   const hStr = h => S.h24 ? pad(h) : String(h % 12 || 12);
   function updateText(now) {
     const dowShort = now.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-    const dKey = now.toDateString() + S.week;
+    const dKey = now.toDateString() + weekStart();
     if (dKey !== lastDateKey) {
       lastDateKey = dKey;
-      if (A) { A.dow.textContent = dowShort; A.day.textContent = ' ' + now.getDate(); }
+      for (const D of [A, Q]) if (D && D.date) { D.dow.textContent = dowShort; D.day.textContent = ' ' + now.getDate(); placeDate(D); }
       renderCal(now);
       $('dDate').innerHTML = `<b>${now.toLocaleDateString('en-US', { weekday: 'long' })}</b> ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`;
       $('wtD').innerHTML = `<b>${dowShort}</b> ${now.getDate()}`;
@@ -569,37 +713,78 @@
     uiTimer = setTimeout(() => document.body.classList.remove('ui'), 4000);
   }
   const overlayOpen = () => $('settings').classList.contains('open') || $('hint').classList.contains('show');
-  function inStack(sx, sy) {
-    if (faces[S.face].id !== 'fB') return false;
-    const st = $('stackB');
-    return portrait ? sy >= st.offsetTop : sx >= st.offsetLeft;
+  const clockTo = side => { if (faces[S.face].id === 'fB' && S.clockSide !== side) { S.clockSide = side; save(); layout(); } };
+  const swapSides = () => clockTo(S.clockSide === 'right' ? 'left' : 'right');
+  // Which split-face pane ('c' clock, 'w' widgets) is under a point in #rot coordinates?
+  function paneAt(sx, sy) {
+    if (faces[S.face].id !== 'fB') return null;
+    const x = sx - ins.l, y = sy - ins.t;
+    for (const k of ['c', 'w']) { const r = PR[k]; if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return k; }
+    return null;
   }
-  let tx = null, ty = null;
+  let tx = null, ty = null, lastTap = 0, lastTouchEnd = 0;
   window.addEventListener('touchstart', e => {
-    if (overlayOpen()) { tx = null; return; }
+    if (overlayOpen() || e.target.closest('.nav')) { tx = null; return; }
     tx = e.touches[0].clientX; ty = e.touches[0].clientY;
   }, { passive: true });
   window.addEventListener('touchend', e => {
+    lastTouchEnd = Date.now();
     if (tx === null) return;
     const [dx, dy] = deltaToStage(e.changedTouches[0].clientX - tx, e.changedTouches[0].clientY - ty);
     const [sx, sy] = toStage(tx, ty);
     tx = null;
-    if (Math.abs(dy) > 40 && Math.abs(dy) > Math.abs(dx) && inStack(sx, sy)) setWidget(S.widget + (dy < 0 ? 1 : -1));
+    const p = paneAt(sx, sy);
+    if (Math.abs(dy) > 40 && Math.abs(dy) > Math.abs(dx) && p) setStack(p, S[stacks[p].key] + (dy < 0 ? 1 : -1));
     else if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) setFace(S.face + (dx < 0 ? 1 : -1));
-    else showUI();
+    else {
+      // Double-tap on the split face swaps the clock and widget sides.
+      const t = Date.now();
+      if (paneAt(sx, sy) && t - lastTap < 350) { swapSides(); lastTap = 0; } else { lastTap = t; showUI(); }
+    }
     requestWakeLock();
   });
   window.addEventListener('wheel', e => {
     const [sx, sy] = toStage(e.clientX, e.clientY);
-    if (!overlayOpen() && inStack(sx, sy) && Math.abs(e.deltaY) > 20) setWidget(S.widget + (e.deltaY > 0 ? 1 : -1));
+    const p = paneAt(sx, sy);
+    if (!overlayOpen() && p && Math.abs(e.deltaY) > 20) setStack(p, S[stacks[p].key] + (e.deltaY > 0 ? 1 : -1));
   }, { passive: true });
+  window.addEventListener('dblclick', e => {
+    const [sx, sy] = toStage(e.clientX, e.clientY);
+    if (!overlayOpen() && !e.target.closest('.nav') && paneAt(sx, sy) && Date.now() - lastTouchEnd > 1000) swapSides();   // mouse only; touch handled above
+  });
   window.addEventListener('mousedown', () => { if (!overlayOpen()) showUI(); requestWakeLock(); });
+  // Desktop keyboard controls (listed in Settings and the README).
+  const openSettings = () => { $('hint').classList.remove('show'); $('settings').classList.add('open'); renderStatus(); };
+  const closeSettings = () => { $('settings').classList.remove('open'); if (document.activeElement) document.activeElement.blur(); };
+  function toggleFullscreen() {
+    const d = document, el = d.documentElement;
+    if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    else if (el.requestFullscreen || el.webkitRequestFullscreen) (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+  }
   window.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-    if (e.key === 'ArrowRight') setFace(S.face + 1);
-    if (e.key === 'ArrowLeft') setFace(S.face - 1);
-    if (e.key === 'ArrowDown') setWidget(S.widget + 1);
-    if (e.key === 'ArrowUp') setWidget(S.widget - 1);
+    if (e.metaKey || e.ctrlKey || e.altKey) return;              // leave browser shortcuts alone
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (k === 'Escape') { $('hint').classList.remove('show'); closeSettings(); return; }
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    if ($('settings').classList.contains('open')) { if (k === 's' || k === ',') closeSettings(); return; }
+    if ($('hint').classList.contains('show')) return;
+    const act = e.shiftKey ? {
+      // Shift+←/→ moves the split face's clock to that side (left = top in portrait); Shift+↑/↓ flips analog ↔ digital.
+      ArrowLeft: () => clockTo('left'), ArrowRight: () => clockTo('right'), h: () => clockTo('left'), l: () => clockTo('right'),
+      ArrowUp: () => setStack('c', S.clockView - 1), ArrowDown: () => setStack('c', S.clockView + 1),
+      k: () => setStack('c', S.clockView - 1), j: () => setStack('c', S.clockView + 1)
+    }[k] : {
+      ArrowRight: () => setFace(S.face + 1), ArrowLeft: () => setFace(S.face - 1),
+      l: () => setFace(S.face + 1), h: () => setFace(S.face - 1),
+      ArrowDown: () => setWidget(S.widget + 1), ArrowUp: () => setWidget(S.widget - 1),
+      j: () => setWidget(S.widget + 1), k: () => setWidget(S.widget - 1),
+      '[': () => shiftMonth(-1), ']': () => shiftMonth(1),
+      s: openSettings, ',': openSettings, f: toggleFullscreen
+    }[k] || (/^[1-9]$/.test(k) && +k <= faces.length ? () => setFace(+k - 1) : null);
+    if (!act) return;
+    e.preventDefault();
+    act();
+    if (k !== 's' && k !== ',' && k !== 'f') showUI();           // flash the page dots so the change is visible
   });
   let resizeT;
   const relayout = () => { clearTimeout(resizeT); resizeT = setTimeout(layout, 120); };
@@ -621,20 +806,65 @@
     renderStatus();
   }
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') { requestWakeLock(); if (!W || Date.now() - W.at > 20 * 60e3) loadWeather(); }
+    if (document.visibilityState === 'visible') { requestWakeLock(); layout(); if (!W || Date.now() - W.at > 20 * 60e3) loadWeather(); }
   });
   setInterval(() => { if (!wakeLock || wakeLock.released) requestWakeLock(); }, 60e3);
 
   // ================= Settings UI =================
   function renderStatus() {
     $('status').innerHTML =
+      (weatherMsg ? `${esc(weatherMsg)}<br>` : '') +
       `${wakeMsg || 'Screen wake lock: not requested yet'}<br>` +
       (standalone ? 'Running as Home Screen app ✓' : 'Running in a browser tab. Use Share → Add to Home Screen for full-screen mode.') +
-      `<br>Swipe left/right to change faces. On the split face, swipe up/down over the widgets to change them.`;
+      `<br>Settings are saved on this phone and kept between launches.` +
+      `<br>Swipe left/right to change faces. On the split face, swipe up/down over the clock (round / square / digital) or over the widgets (weather ↔ calendar). Double-tap it to swap the clock's side.` +
+      `<br>Keyboard: ← → or 1–${faces.length} faces · ↑ ↓ widgets · Shift+↑ ↓ clock style · Shift+← → clock side · [ ] month · S settings · F full screen · Esc close.`;
   }
   function applySettings() {
     root.style.setProperty('--day-opacity', S.dim);
     root.style.setProperty('--night-opacity', S.nightDim);
+  }
+  function syncCityUI() {
+    const inp = $('sCity');
+    if (document.activeElement !== inp) inp.value = S.place ? S.place.label : '';
+    $('cityNow').textContent = S.place ? '' : (W && W.here ? `· current location (${W.name})` : '· current location');
+  }
+  function choosePlace(p) {
+    S.place = p; S.city = p ? p.name : '';
+    save(); W = null; $('citySug').innerHTML = ''; $('sCity').blur();
+    syncCityUI(); renderWeather(); lastDateKey = ''; updateText(new Date());
+    loadWeather(true);
+  }
+  function bindCity() {
+    const inp = $('sCity'), sug = $('citySug');
+    let results = [], timer, seq = 0;
+    syncCityUI();
+    inp.addEventListener('input', () => {
+      clearTimeout(timer);
+      const q = inp.value.trim();
+      if (q.length < 2) { results = []; sug.innerHTML = ''; return; }
+      timer = setTimeout(async () => {
+        const my = ++seq;
+        try {
+          const res = await geocode(q, 8);
+          if (my !== seq) return;
+          results = res.map(placeFrom);
+          sug.innerHTML = results.length
+            ? results.map((p, i) => `<button data-i="${i}">${esc(p.name)} <small>${esc(p.label.slice(p.name.length + 2))}</small></button>`).join('')
+            : '<button disabled><small>No matches</small></button>';
+        } catch (e) { if (my === seq) sug.innerHTML = '<button disabled><small>Search failed (offline?)</small></button>'; }
+      }, 250);
+    });
+    sug.addEventListener('click', e => {
+      const b = e.target.closest('button[data-i]');
+      if (b) choosePlace(results[+b.dataset.i]);
+    });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter' && results.length) { e.preventDefault(); choosePlace(results[0]); } });
+    inp.addEventListener('blur', () => setTimeout(() => {
+      if (!inp.value.trim() && S.place) choosePlace(null);   // cleared the field: back to current location
+      else if (document.activeElement !== inp) { syncCityUI(); }
+    }, 300));
+    $('sHere').addEventListener('click', () => { results = []; sug.innerHTML = ''; inp.value = ''; choosePlace(null); });
   }
   function bindSettings() {
     const bind = (id, key, type, after) => {
@@ -651,14 +881,14 @@
     bind('s24', 'h24', 'check'); bind('sSecs', 'secs', 'check'); bind('sSmooth', 'smooth', 'check');
     bind('sDim', 'dim', 'num'); bind('sNightDim', 'nightDim', 'num');
     bind('sNight', 'night'); bind('sNightStart', 'nightStart'); bind('sNightEnd', 'nightEnd');
-    bind('sCity', 'city', 'text', () => { W = null; renderWeather(); loadWeather(); });
-    bind('sUnits', 'units', 'sel', () => loadWeather());
-    bind('sWeek', 'week', 'num');
+    bindCity();
+    bind('sUnits', 'units', 'sel', () => loadWeather(true));
+    bind('sWeek', 'week', 'sel');
     bind('sWRotate', 'wRotate', 'num', startWidgetRotate);
     bind('sShiftEvery', 'shiftEvery', 'num', startShift); bind('sShiftPx', 'shiftPx', 'num', startShift);
     bind('sRotate', 'rotateMin', 'num', startRotate);
-    $('gear').addEventListener('click', e => { e.stopPropagation(); $('settings').classList.add('open'); renderStatus(); });
-    $('closeSettings').addEventListener('click', () => $('settings').classList.remove('open'));
+    $('gear').addEventListener('click', e => { e.stopPropagation(); openSettings(); });
+    $('closeSettings').addEventListener('click', closeSettings);
     $('settings').addEventListener('click', e => { if (e.target.id === 'settings') $('settings').classList.remove('open'); });
   }
 
@@ -678,6 +908,7 @@
   layout();
   setFace(S.face);
   setWidget(S.widget, false);
+  setStack('c', S.clockView, false);
   renderWeather();
   tick();
   requestAnimationFrame(sweep);
@@ -689,7 +920,7 @@
   setupHint();
   loadWeather();
 
-  window.__clock = { setFace, setWidget, layout, S };
+  window.__clock = { setFace, setWidget, setStack, layout, S };
 })();
 </script>
 </body>
