@@ -1,0 +1,27 @@
+# XcodeGen spec. The Xcode project is generated from this (see .github/workflows/ios.yml).
+name: StandByClock
+options:
+  bundleIdPrefix: io.github.qwertycode
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  StandByClock:
+    type: application
+    platform: iOS
+    scheme: {}
+    sources:
+      - path: StandByClock
+      # Copy of the web app (index.html, manifest, icons), made by the build.
+      - path: web
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.qwertycode.standbyclock
+        PRODUCT_NAME: StandByClock
+        INFOPLIST_FILE: StandByClock/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.0"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"

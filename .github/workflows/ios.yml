@@ -1,0 +1,96 @@
+# Builds the iOS app (unsigned .ipa) and publishes it as a GitHub Release, together with
+# an AltStore/SideStore source (source.json). SideStore signs it with the user's own
+# Apple ID on the phone and refreshes it automatically.
+name: iOS app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - manifest.webmanifest
+      - icons/**
+      - ios/**
+      - .github/workflows/ios.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-15
+    env:
+      VERSION: 1.0.${{ github.run_number }}
+      BUILD: ${{ github.run_number }}
+      TAG: ios-v1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Bundle the web app
+        run: |
+          mkdir -p ios/web
+          cp index.html manifest.webmanifest ios/web/
+          cp -R icons ios/web/
+          sips -z 1024 1024 icons/icon-512.png \
+            --out ios/StandByClock/Assets.xcassets/AppIcon.appiconset/icon-1024.png
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build unsigned app
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -project StandByClock.xcodeproj \
+            -scheme StandByClock \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package .ipa
+        working-directory: ios
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/StandByClock.app Payload/
+          zip -qry StandByClock.ipa Payload
+          ls -l StandByClock.ipa
+
+      - name: Write source.json
+        working-directory: ios
+        run: |
+          SIZE=$(stat -f%z StandByClock.ipa)
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          URL="https://github.com/${{ github.repository }}/releases/download/$TAG/StandByClock.ipa"
+          jq --arg v "$VERSION" --arg b "$BUILD" --arg d "$DATE" --arg u "$URL" --argjson s "$SIZE" '
+            .apps[0] += { version: $v, versionDate: $d, downloadURL: $u, size: $s }
+            | .apps[0].versions = [{ version: $v, buildVersion: $b, date: $d, downloadURL: $u, size: $s, minOSVersion: "16.0" }]
+          ' source.json > release-source.json
+          mv release-source.json source.json
+          cat source.json
+
+      - name: Publish release
+        working-directory: ios
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" StandByClock.ipa source.json \
+            --title "iOS app $VERSION" \
+            --notes "Unsigned build for SideStore / AltStore. See the README for install steps." \
+            --target "${{ github.sha }}" \
+            --latest
